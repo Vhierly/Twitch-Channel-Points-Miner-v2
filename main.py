@@ -1,24 +1,33 @@
 # -*- coding: utf-8 -*-
 
-import keep_replit_alive
-import logging
-from colorama import Fore
-from TwitchChannelPointsMiner import TwitchChannelPointsMiner
-from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
-from TwitchChannelPointsMiner.classes.Chat import ChatPresence
-from TwitchChannelPointsMiner.classes.Discord import Discord
-from TwitchChannelPointsMiner.classes.Webhook import Webhook
-from TwitchChannelPointsMiner.classes.Telegram import Telegram
-from TwitchChannelPointsMiner.classes.Matrix import Matrix
-from TwitchChannelPointsMiner.classes.Pushover import Pushover
-from TwitchChannelPointsMiner.classes.Settings import Priority, Events, FollowersOrder
-from TwitchChannelPointsMiner.classes.entities.Bet import Strategy, BetSettings, Condition, OutcomeKeys, FilterCondition, DelayMode
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
-
+from TwitchChannelPointsMiner.classes.entities.Bet import Strategy, BetSettings, Condition, OutcomeKeys, FilterCondition, DelayMode
+from TwitchChannelPointsMiner.classes.Settings import Priority, Events, FollowersOrder
+from TwitchChannelPointsMiner.classes.Pushover import Pushover
+from TwitchChannelPointsMiner.classes.Matrix import Matrix
+from TwitchChannelPointsMiner.classes.Telegram import Telegram
+from TwitchChannelPointsMiner.classes.Webhook import Webhook
+from TwitchChannelPointsMiner.classes.Discord import Discord
+from TwitchChannelPointsMiner.classes.Chat import ChatPresence
+from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
+from TwitchChannelPointsMiner import TwitchChannelPointsMiner
+from colorama import Fore
+import logging
+import keep_replit_alive
+import os
+from dotenv import load_dotenv
+load_dotenv()
+username = os.getenv("TWITCH_USERNAME")
+password = os.getenv("TWITCH_PASSWORD")
+telech = os.getenv("TELEGRAM_CHAT_ID")
+discord = os.getenv("DISCORD_WEBHOOK")
+telegram = os.getenv("TELEGRAM_TOKEN")
+pushoverkey = os.getenv("PUSHOVER_USER_KEY")
+pushovertoken = os.getenv("PUSHOVER_TOKEN")
 twitch_miner = TwitchChannelPointsMiner(
-    username="clauciee",
+    username=username,
     # If no password will be provided, the script will ask interactively
-    password="Kambingutang123!@#",
+    password=password,
     # If you want to auto claim all drops from Twitch inventory on the startup
     claim_drops_startup=True,
     priority=[                                  # Custom priority in this case for example:
@@ -62,9 +71,9 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         telegram=Telegram(                                                          # You can omit or set to None if you don't want to receive updates on Telegram
             # Chat ID to send messages @getmyid_bot
-            chat_id="@twitcherlahh",
+            chat_id=telech,
             # Telegram API token @BotFather
-            token="5807536863:AAHpuQs_OmPW7UiayO9ejTWRy_hgrznXwVY",
+            token=telegram,
             events=[Events.BET_START, Events.BET_LOSE, Events.CHAT_MENTION, Events.BET_WIN, Events.JOIN_RAID,
                     Events.STREAMER_ONLINE, Events.GAIN_FOR_RAID, Events.GAIN_FOR_CLAIM,
                     Events.GAIN_FOR_WATCH],
@@ -73,7 +82,7 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         discord=Discord(
             # Discord Webhook URL
-            webhook_api="https://discordapp.com/api/webhooks/1097109022211047434/IWCZutYdFHojQdlIODBV3nK9WSyc8neQGjpYMUPFBa56i4NIRUhNJg-VW_yTMNAzdQdg",
+            webhook_api=discord,
             events=[Events.BET_START, Events.BET_LOSE, Events.CHAT_MENTION, Events.BET_WIN, Events.JOIN_RAID,
                     Events.STREAMER_ONLINE, Events.GAIN_FOR_RAID, Events.GAIN_FOR_CLAIM,
                     Events.GAIN_FOR_WATCH],
@@ -101,9 +110,9 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         pushover=Pushover(
             # Login to https://pushover.net/, the user token is on the main page
-            userkey="uqyi3ymvcnqdq54yzasn1zi4qcqvng",
+            userkey=pushoverkey,
             # Create a application on the website, and use the token shown in your application
-            token="a6s6z3dansqopkswto36kgpu2px6z2",
+            token=pushovertoken,
             # Read more about priority here: https://pushover.net/api#priority
             priority=0,
             # A list of sounds can be found here: https://pushover.net/api#sounds
