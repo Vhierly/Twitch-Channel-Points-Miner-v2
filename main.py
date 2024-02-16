@@ -19,8 +19,8 @@ load_dotenv()
 
 
 twitch_miner = TwitchChannelPointsMiner(
-    username='clauciee',
-    password='Kambingutang123!@#',
+    username='username',
+    password='passwd',
     # If you want to auto claim all drops from Twitch inventory on the startup
     claim_drops_startup=True,
     priority=[                                  # Custom priority in this case for example:
@@ -64,9 +64,9 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         telegram=Telegram(                                                          # You can omit or set to None if you don't want to receive updates on Telegram
             # Chat ID to send messages @getmyid_bot
-            chat_id='@twitcherlahh',
+            chat_id='telech',
             # Telegram API token @BotFather
-            token='5807536863:AAHpuQs_OmPW7UiayO9ejTWRy_hgrznXwVY',
+            token='tokench',
             events=[Events.BET_START, Events.BET_LOSE, Events.CHAT_MENTION, Events.BET_WIN, Events.JOIN_RAID,
                     Events.STREAMER_ONLINE, Events.GAIN_FOR_RAID, Events.GAIN_FOR_CLAIM,
                     Events.GAIN_FOR_WATCH],
@@ -75,7 +75,7 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         discord=Discord(
             # Discord Webhook URL
-            webhook_api='https://discordapp.com/api/webhooks/1097109022211047434/IWCZutYdFHojQdlIODBV3nK9WSyc8neQGjpYMUPFBa56i4NIRUhNJg-VW_yTMNAzdQdg',
+            webhook_api='dwebhook',
             events=[Events.BET_START, Events.BET_LOSE, Events.CHAT_MENTION, Events.BET_WIN, Events.JOIN_RAID,
                     Events.STREAMER_ONLINE, Events.GAIN_FOR_RAID, Events.GAIN_FOR_CLAIM,
                     Events.GAIN_FOR_WATCH],
@@ -103,9 +103,9 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         pushover=Pushover(
             # Login to https://pushover.net/, the user token is on the main page
-            userkey='uqyi3ymvcnqdq54yzasn1zi4qcqvng',
+            userkey='userpush',
             # Create a application on the website, and use the token shown in your application
-            token='a6s6z3dansqopkswto36kgpu2px6z2',
+            token='tokenpush',
             # Read more about priority here: https://pushover.net/api#priority
             priority=0,
             # A list of sounds can be found here: https://pushover.net/api#sounds
