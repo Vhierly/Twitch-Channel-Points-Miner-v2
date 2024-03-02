@@ -29,7 +29,7 @@
 
 > It can wait for a streamer to go live (+_450 points_ when the stream starts), it will automatically click the bonus button (_+50 points_), and it will follow raids (_+250 points_).
 
-Read more about channels point [here](https://help.twitch.tv/s/article/channel-points-guide).
+Read more about the channel points [here](https://help.twitch.tv/s/article/channel-points-guide).
 
 # README Contents
 1. 🤝 [Community](#community)
@@ -63,10 +63,6 @@ Read more about channels point [here](https://help.twitch.tv/s/article/channel-p
 If you want to help with this project, please leave a star 🌟 and share it with your friends! 😎
 
 If you want to offer me a coffee, I would be grateful! ❤️
-
-|                                                                                                                                                                                                                                                                                                           |
-|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|<a href="https://www.buymeacoffee.com/davydov" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/lato-yellow.png" alt="Buy Me A Coffee (rdavydov)" height="41" width="174"></a>|
 
 |                                                                                                                                                                                                                                                                                                           |                                               |
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|
@@ -594,6 +590,14 @@ Allowed values for `chat` are:
 - **PERCENTAGE**: Select the option with the highest percentage based on odds (It's the same that show Twitch) - Should be the same as select LOWEST_ODDS
 - **SMART_MONEY**: Select the option with the highest points placed. [#331](https://github.com/Tkd-Alex/Twitch-Channel-Points-Miner-v2/issues/331)
 - **SMART**: If the majority in percent chose an option, then follow the other users, otherwise select the option with the highest odds
+- **NUMBER_1**: Always select the 1st option, BLUE side if there are only two options
+- **NUMBER_2**: Always select the 2nd option, PINK side if there are only two options
+- **NUMBER_3**: Always select the 3rd option
+- **NUMBER_4**: Always select the 4th option
+- **NUMBER_5**: Always select the 5th option
+- **NUMBER_6**: Always select the 6th option
+- **NUMBER_7**: Always select the 7th option
+- **NUMBER_8**: Always select the 8th option
 
 ![Screenshot](https://raw.githubusercontent.com/Tkd-Alex/Twitch-Channel-Points-Miner-v2/master/assets/prediction.png)
 
