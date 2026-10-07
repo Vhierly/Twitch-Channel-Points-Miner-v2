@@ -67,6 +67,10 @@ class Twitch(object):
         "twilight_build_id_pattern",
         "_connection_error_logged",
         "proxy",
+        "_session",
+        "_stream_url_cache",
+        "_stream_url_cache_time",
+        "_stream_url_cache_ttl",
     ]
 
     def __init__(self, username, user_agent, password=None, proxy=None):
@@ -90,6 +94,13 @@ class Twitch(object):
         self.twilight_build_id_pattern = re.compile(
             r'window\.__twilightBuildID\s*=\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"'
         )
+        # #789: Use session for connection pooling to reduce network overhead
+        self._session = requests.Session()
+        self._session.headers.update({"User-Agent": self.user_agent})
+        # Cache for stream URLs to reduce requests
+        self._stream_url_cache = {}
+        self._stream_url_cache_time = 0
+        self._stream_url_cache_ttl = 300  # 5 minutes cache
 
     def login(self):
         if not os.path.isfile(self.cookies_file):
@@ -298,7 +309,8 @@ class Twitch(object):
         proxies = {"http": self.proxy, "https": self.proxy} if self.proxy else None
         for attempt in range(max_retries):
             try:
-                response = requests.post(
+                # #789: Use session for connection pooling to reduce network overhead
+                response = self._session.post(
                     GQLOperations.url,
                     json=json_data,
                     headers={
@@ -314,10 +326,74 @@ class Twitch(object):
                     verify=not Settings.disable_ssl_cert_verification,
                     proxies=proxies,
                 )
+                # #789: Only log at debug level to reduce I/O overhead
                 logger.debug(
                     f"Data: {json_data}, Status code: {response.status_code}, Content: {response.text}"
                 )
-                return response.json()
+                response_json = response.json()
+
+                # #776: Handle PersistedQueryNotFound - retry with full query body
+                if (
+                    isinstance(response_json, dict)
+                    and "errors" in response_json
+                    and isinstance(response_json["errors"], list)
+                    and any(
+                        err.get("message") == "PersistedQueryNotFound"
+                        for err in response_json["errors"]
+                        if isinstance(err, dict)
+                    )
+                ):
+                    logger.warning(
+                        f"PersistedQueryNotFound for {json_data.get('operationName', 'unknown')}, "
+                        "retrying with full query body"
+                    )
+                    # Build fallback request with full query
+                    fallback_data = copy.deepcopy(json_data)
+                    # Remove persistedQuery extension and add query + variables
+                    if "extensions" in fallback_data:
+                        fallback_data["extensions"].pop("persistedQuery", None)
+                    # Add the query string if we have it
+                    if "query" not in fallback_data:
+                        # Try to get query from GQLOperations
+                        op_name = json_data.get("operationName", "")
+                        gql_op = getattr(GQLOperations, op_name, None)
+                        if gql_op and "query" in gql_op:
+                            fallback_data["query"] = gql_op["query"]
+                        else:
+                            # Can't build fallback, return empty
+                            logger.error(
+                                f"Cannot build fallback query for {op_name}, no query template available"
+                            )
+                            return {}
+                    # Retry with fallback
+                    response = self._session.post(
+                        GQLOperations.url,
+                        json=fallback_data,
+                        headers={
+                            "Authorization": f"OAuth {self.twitch_login.get_auth_token()}",
+                            "Client-Id": CLIENT_ID,
+                            "Client-Session-Id": self.client_session,
+                            "Client-Version": self.update_client_version(),
+                            "User-Agent": self.user_agent,
+                            "X-Device-Id": self.device_id,
+                        },
+                        timeout=15,
+                        verify=not Settings.disable_ssl_cert_verification,
+                        proxies=proxies,
+                    )
+                    logger.debug(
+                        f"Fallback request: {fallback_data}, Status code: {response.status_code}, Content: {response.text}"
+                    )
+                    return response.json()
+
+                # #622: Validate response from Twitch
+                if not isinstance(response_json, dict):
+                    logger.warning(
+                        f"Invalid response from Twitch (not a dict): {response_json}"
+                    )
+                    return {}
+
+                return response_json
             except requests.exceptions.ConnectionError as e:
                 if attempt < max_retries - 1:
                     wait_time = (2 ** attempt) * 5
@@ -484,6 +560,15 @@ class Twitch(object):
                         Each stream must be at least 10 minutes long and it must have been at least 30 minutes since the last stream ended.
                         Watch at least 6m for get the +10
                         """
+                        # #806: Remove watched streamers that no longer need streak
+                        # to make room for other streamers that still need it
+                        for watched_index in list(streamers_watching):
+                            if (
+                                streamers[watched_index].settings.watch_streak is True
+                                and streamers[watched_index].stream.watch_streak_missing is False
+                            ):
+                                streamers_watching.discard(watched_index)
+
                         for index in streamers_index:
                             if (
                                 streamers[index].settings.watch_streak is True
@@ -604,49 +689,57 @@ class Twitch(object):
                         # Construct the URL for the broadcast qualities
                         RequestBroadcastQualitiesURL = f"https://usher.ttvnw.net/api/channel/hls/{streamers[index].username}.m3u8?sig={signature}&token={value}"
 
-                        # Get list of video qualities
-                        responseBroadcastQualities = requests.get(
-                            RequestBroadcastQualitiesURL,
-                            headers={"User-Agent": self.user_agent},
-                            timeout=20,
-                            verify=not Settings.disable_ssl_cert_verification,
-                        )  # timeout=60
-                        logger.debug(
-                            f"Send RequestBroadcastQualitiesURL request for {streamers[index]} - Status code: {responseBroadcastQualities.status_code}"
-                        )
-                        if responseBroadcastQualities.status_code != 200:
-                            continue
-                        BroadcastQualities = responseBroadcastQualities.text
+                        # #789: Cache stream URLs to reduce network requests
+                        cache_key = f"{streamers[index].username}_stream"
+                        current_time = time.time()
+                        if (cache_key in self._stream_url_cache and
+                                current_time - self._stream_url_cache_time < self._stream_url_cache_ttl):
+                            StreamLowestQualityURL = self._stream_url_cache[cache_key]
+                        else:
+                            # Get list of video qualities
+                            responseBroadcastQualities = self._session.get(
+                                RequestBroadcastQualitiesURL,
+                                timeout=20,
+                                verify=not Settings.disable_ssl_cert_verification,
+                            )  # timeout=60
+                            logger.debug(
+                                f"Send RequestBroadcastQualitiesURL request for {streamers[index]} - Status code: {responseBroadcastQualities.status_code}"
+                            )
+                            if responseBroadcastQualities.status_code != 200:
+                                continue
+                            BroadcastQualities = responseBroadcastQualities.text
 
-                        # Just takes the last line, which should be the URL for the lowest quality
-                        BroadcastLowestQualityURL = BroadcastQualities.split(
-                            "\n")[-1]
-                        if not validators.url(BroadcastLowestQualityURL):
-                            continue
+                            # Just takes the last line, which should be the URL for the lowest quality
+                            BroadcastLowestQualityURL = BroadcastQualities.split(
+                                "\n")[-1]
+                            if not validators.url(BroadcastLowestQualityURL):
+                                continue
 
-                        # Get list of video URLs
-                        responseStreamURLList = requests.get(
-                            BroadcastLowestQualityURL,
-                            headers={"User-Agent": self.user_agent},
-                            timeout=20,
-                            verify=not Settings.disable_ssl_cert_verification,
-                        )  # timeout=60
-                        logger.debug(
-                            f"Send BroadcastLowestQualityURL request for {streamers[index]} - Status code: {responseStreamURLList.status_code}"
-                        )
-                        if responseStreamURLList.status_code != 200:
-                            continue
-                        StreamURLList = responseStreamURLList.text
+                            # Get list of video URLs
+                            responseStreamURLList = self._session.get(
+                                BroadcastLowestQualityURL,
+                                timeout=20,
+                                verify=not Settings.disable_ssl_cert_verification,
+                            )  # timeout=60
+                            logger.debug(
+                                f"Send BroadcastLowestQualityURL request for {streamers[index]} - Status code: {responseStreamURLList.status_code}"
+                            )
+                            if responseStreamURLList.status_code != 200:
+                                continue
+                            StreamURLList = responseStreamURLList.text
 
-                        # Just takes the last line, which should be the URL for the lowest quality
-                        StreamLowestQualityURL = StreamURLList.split("\n")[-2]
-                        if not validators.url(StreamLowestQualityURL):
-                            continue
+                            # Just takes the last line, which should be the URL for the lowest quality
+                            StreamLowestQualityURL = StreamURLList.split("\n")[-2]
+                            if not validators.url(StreamLowestQualityURL):
+                                continue
+
+                            # Cache the URL
+                            self._stream_url_cache[cache_key] = StreamLowestQualityURL
+                            self._stream_url_cache_time = current_time
 
                         # Perform a HEAD request to simulate watching the stream
-                        responseStreamLowestQualityURL = requests.head(
+                        responseStreamLowestQualityURL = self._session.head(
                             StreamLowestQualityURL,
-                            headers={"User-Agent": self.user_agent},
                             timeout=20,
                         )  # timeout=60
                         logger.debug(
@@ -804,7 +897,9 @@ class Twitch(object):
                 logger.warning(f"Invalid response from load_channel_points_context for {streamer.username}: {response}")
                 return
             if response["data"]["community"] is None:
-                raise StreamerDoesNotExistException
+                # #711: Return None instead of raising exception to prevent crash
+                logger.warning(f"Streamer {streamer.username} does not exist or has no community")
+                return None
             channel = response["data"]["community"]["channel"]
             community_points = channel["self"]["communityPoints"]
             streamer.channel_points = community_points["balance"]
@@ -1035,6 +1130,14 @@ class Twitch(object):
         return campaigns
 
     def claim_drop(self, drop):
+        # Skip drops that need a connected account we don't have
+        if drop.has_preconditions_met is False:
+            logger.warning(
+                f"Skipping claim for {drop} - preconditions not met (likely needs connected game account)",
+                extra={"emoji": ":warning:", "event": Events.DROP_CLAIM}
+            )
+            return False
+
         logger.info(
             f"Claim {drop}", extra={"emoji": ":package:", "event": Events.DROP_CLAIM}
         )
@@ -1071,6 +1174,12 @@ class Twitch(object):
                         drop = Drop(drop_dict)
                         drop.update(drop_dict["self"])
                         if drop.is_claimable is True:
+                            # Skip drops that need a connected account we don't have
+                            if drop.has_preconditions_met is False:
+                                logger.debug(
+                                    f"Skipping inventory claim for {drop.name} - preconditions not met"
+                                )
+                                continue
                             drop.is_claimed = self.claim_drop(drop)
                             time.sleep(random.uniform(5, 10))
 

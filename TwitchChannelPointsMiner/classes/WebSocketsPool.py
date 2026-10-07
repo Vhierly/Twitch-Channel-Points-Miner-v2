@@ -142,10 +142,26 @@ class WebSocketsPool:
             ws.is_reconnecting = True
 
             if ws.forced_close is False:
+                # #644: Track reconnection attempts to prevent infinite loops
+                reconnect_attempts = getattr(ws, '_reconnect_attempts', 0) + 1
+                ws._reconnect_attempts = reconnect_attempts
+
+                # #644: Exponential backoff with max 5 attempts before longer wait
+                if reconnect_attempts <= 5:
+                    wait_time = min(30 * (2 ** (reconnect_attempts - 1)), 300)
+                else:
+                    # After 5 attempts, wait 5 minutes and reset counter
+                    wait_time = 300
+                    ws._reconnect_attempts = 0
+                    logger.warning(
+                        f"#{ws.index} - Multiple reconnection attempts ({reconnect_attempts}). "
+                        f"Waiting {wait_time}s before next attempt..."
+                    )
+
                 logger.info(
-                    f"#{ws.index} - Reconnecting to Twitch PubSub server in ~60 seconds"
+                    f"#{ws.index} - Reconnecting to Twitch PubSub server in ~{wait_time} seconds (attempt {reconnect_attempts})"
                 )
-                time.sleep(30)
+                time.sleep(wait_time)
 
                 while internet_connection_available() is False:
                     random_sleep = random.randint(1, 3)

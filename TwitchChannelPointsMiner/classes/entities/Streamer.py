@@ -173,7 +173,14 @@ class Streamer(object):
         if self.is_online is False:
             self.online_at = time.time()
             self.is_online = True
-            self.stream.init_watch_streak()
+            # #825: Preserve watch streak progress if streamer was recently offline
+            # Only reset streak if it's been more than 30 minutes since last offline
+            # or if we haven't started watching yet
+            if self.offline_at == 0 or (time.time() - self.offline_at) > 1800:
+                self.stream.init_watch_streak()
+            # If streamer was offline for less than 30 minutes, preserve streak progress
+            # by not calling init_watch_streak() - minute_watched and watch_streak_missing
+            # are retained from the previous session
 
         self.toggle_chat()
 
