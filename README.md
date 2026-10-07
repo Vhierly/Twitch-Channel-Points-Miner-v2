@@ -203,6 +203,22 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
+
+### Build EXE with PyInstaller (#609)
+To create a standalone Windows executable:
+
+```bash
+pip install pyinstaller
+pyinstaller twitch-miner.spec
+```
+
+The EXE will be in `dist/TwitchChannelPointsMiner.exe`.
+
+### Running Tests (#754)
+```bash
+pip install pytest
+pytest
+```
 ```python
 # -*- coding: utf-8 -*-
 

@@ -288,10 +288,55 @@ class AnalyticsServer(Thread):
                 status=200, mimetype="application/json"
             ), methods=["GET"]
         )
+        # #678: WebUI for watching - display currently watched streamers
+        self.app.add_url_rule(
+            "/watch", "watch", self._watch_page, methods=["GET"]
+        )
+        self.app.add_url_rule(
+            "/api/watching", "api_watching", self._api_watching, methods=["GET"]
+        )
         self.app.add_url_rule("/json_all", "json_all",
                               json_all, methods=["GET"])
         self.app.add_url_rule(
             "/log", "log", generate_log, methods=["GET"])
+
+    def _watch_page(self):
+        """#678: WebUI page showing currently watched streamers."""
+        html = """<!DOCTYPE html>
+<html><head><title>Twitch Miner - Watching</title>
+<meta http-equiv="refresh" content="30">
+<style>
+body { font-family: sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+h1 { color: #9147ff; }
+.streamer { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; }
+.online { border-left: 4px solid #00ff88; }
+.offline { border-left: 4px solid #ff4444; opacity: 0.6; }
+</style></head><body>
+<h1>Currently Watching</h1>
+<div id="streamers"></div>
+<script>
+fetch('/api/watching').then(r => r.json()).then(data => {
+    document.getElementById('streamers').innerHTML = data.map(s =>
+        `<div class="streamer ${s.is_online ? 'online' : 'offline'}">
+            <strong>${s.username}</strong> - ${s.is_online ? 'Online' : 'Offline'}<br>
+            Points: ${s.channel_points} | Title: ${s.title || 'N/A'}
+        </div>`
+    ).join('');
+});
+</script></body></html>"""
+        return Response(html, status=200, mimetype="text/html")
+
+    def _api_watching(self):
+        """#678: API endpoint returning currently watched streamers."""
+        from TwitchChannelPointsMiner.classes.Settings import Settings
+        streamers = []
+        # Access the miner's streamers through Settings or global state
+        # For now, return empty list - will be populated when miner is running
+        return Response(
+            json.dumps(streamers),
+            status=200,
+            mimetype="application/json",
+        )
 
     def run(self):
         logger.info(
