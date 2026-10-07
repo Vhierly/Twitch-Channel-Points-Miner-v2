@@ -1,10 +1,13 @@
 # Twitch endpoints
-URL = "https://www.twitch.tv"
+URL = "https://www.twitch.tv"               # Browser, Apps
+# URL = "https://m.twitch.tv"               # Mobile Browser
+# URL = "https://android.tv.twitch.tv"      # TV
 IRC = "irc.chat.twitch.tv"
 IRC_PORT = 6667
 WEBSOCKET = "wss://pubsub-edge.twitch.tv/v1"
 CLIENT_ID = "ue6666qo983tsx6so1t0vnawi233wa"        # TV
 # CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"      # Browser
+# CLIENT_ID = "r8s4dac0uhzifbpu9sjdiwzctle17ff"     # Mobile Browser
 # CLIENT_ID = "kd1unb4b3q4t58fwlpcbzcbnm76a8fp"     # Android App
 # CLIENT_ID = "851cqzxpb9bqu9z6galo155du"           # iOS App
 DROP_ID = "c2542d6d-cd10-4532-919b-3d19f30a768b"
@@ -46,12 +49,21 @@ class GQLOperations:
             }
         },
     }
+    PlaybackAccessToken = {
+        "operationName": "PlaybackAccessToken",
+        "extensions": {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "ed230aa1e33e07eebb8928504583da78a5173989fadfb1ac94be06a04f3cdbe9",
+            }
+        },
+    }
     VideoPlayerStreamInfoOverlayChannel = {
         "operationName": "VideoPlayerStreamInfoOverlayChannel",
         "extensions": {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "a5f2e34d626a9f4f5c0204f910bab2194948a9502089be558bb6e779a9e1b3d2",
+                "sha256Hash": "198492e0857f6aedead9665c81c5a06d67b25b58034649687124083ff288597d",
             }
         },
     }
@@ -87,7 +99,7 @@ class GQLOperations:
         "extensions": {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "1530a003a7d374b0380b79db0be0534f30ff46e61cffa2bc0e2468a909fbc024",
+                "sha256Hash": "7fe050e3761eb2cf258d70ee1a21cbd76fa8cf3d7e7b12fc437e7029d446b5e3",
             }
         },
     }
@@ -116,7 +128,7 @@ class GQLOperations:
         "extensions": {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "37fea486d6179047c41d0f549088a4c3a7dd60c05c70956a1490262f532dccd9",
+                "sha256Hash": "d86775d0ef16a63a33ad52e80eaff963b2d5b72fada7c991504a57496e1d8e4b",
             }
         },
     }
@@ -136,7 +148,7 @@ class GQLOperations:
         "extensions": {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "8d5d9b5e3f088f9d1ff39eb2caab11f7a4cf7a3353da9ce82b5778226ff37268",
+                "sha256Hash": "5a4da2ab3d5b47c9f9ce864e727b2cb346af1e3ea8b897fe8f704a97ff017619",
             }
         },
     }
@@ -158,12 +170,13 @@ class GQLOperations:
             }
         },
     }
-    ReportMenuItem = {  # Use for replace https://api.twitch.tv/helix/users?login={self.username}
-        "operationName": "ReportMenuItem",
+    GetIDFromLogin = {
+        "operationName": "GetIDFromLogin",
+        "variables": {"login": None},
         "extensions": {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "8f3628981255345ca5e5453dfd844efffb01d6413a9931498836e6268692a30c",
+                "sha256Hash": "94e82a7b1e3c21e186daa73ee2afc4b8f23bade1fbbff6fe8ac133f50a2f58ca",
             }
         },
     }
@@ -196,4 +209,22 @@ class GQLOperations:
                 "sha256Hash": "eecf815273d3d949e5cf0085cc5084cd8a1b5b7b6f7990cf43cb0beadf546907",
             }
         },
+    }
+    UserPointsContribution = {
+        "operationName": "UserPointsContribution",
+        "extensions": {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "23ff2c2d60708379131178742327ead913b93b1bd6f665517a6d9085b73f661f"
+            }
+        }
+    }
+    ContributeCommunityPointsCommunityGoal = {
+        "operationName": "ContributeCommunityPointsCommunityGoal",
+        "extensions": {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "5774f0ea5d89587d73021a2e03c3c44777d903840c608754a1be519f51e37bb6"
+            }
+        }
     }
