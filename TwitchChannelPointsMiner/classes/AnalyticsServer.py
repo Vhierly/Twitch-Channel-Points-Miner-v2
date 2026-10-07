@@ -279,7 +279,14 @@ class AnalyticsServer(Thread):
         self.app.add_url_rule("/streamers", "streamers",
                               streamers, methods=["GET"])
         self.app.add_url_rule(
-            "/json/<string:streamer>", "json", read_json, methods=["GET"]
+            "/log", "log", generate_log, methods=["GET"]
+        )
+        # #591: Health check endpoint for Docker/monitoring
+        self.app.add_url_rule(
+            "/health", "health", lambda: Response(
+                json.dumps({"status": "ok", "timestamp": datetime.now().isoformat()}),
+                status=200, mimetype="application/json"
+            ), methods=["GET"]
         )
         self.app.add_url_rule("/json_all", "json_all",
                               json_all, methods=["GET"])

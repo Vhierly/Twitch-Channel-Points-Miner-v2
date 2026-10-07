@@ -770,6 +770,12 @@ class Twitch(object):
                         if response.status_code == 204:
                             streamers[index].stream.update_minute_watched()
 
+                            # #710: Log points gained for debugging
+                            logger.debug(
+                                f"Minute watched sent for {streamers[index].username}, "
+                                f"total minutes: {streamers[index].stream.minute_watched}"
+                            )
+
                             # #775: Watch streak notification
                             if (
                                 streamers[index].stream.watch_streak_claimed is False
@@ -892,9 +898,10 @@ class Twitch(object):
                 if streamers_watching == []:
                     # self.__chuncked_sleep(60, chunk_size=chunk_size)
                     self.__chuncked_sleep(20, chunk_size=chunk_size)
-            except Exception:
+            except Exception as e:
+                # #615: Log with context but don't crash the thread
                 logger.error(
-                    "Exception raised in send minute watched", exc_info=True)
+                    f"Exception raised in send minute watched: {e}", exc_info=True)
 
     # === CHANNEL POINTS / PREDICTION === #
     # Load the amount of current points for a channel, check if a bonus is available

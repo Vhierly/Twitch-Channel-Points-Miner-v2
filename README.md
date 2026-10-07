@@ -194,6 +194,15 @@ If you have any issues or you want to contribute, you are welcome! But please re
 
 ## How to use:
 First of all please create a run.py file. You can just copy [example.py](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/blob/master/example.py) and modify it according to your needs.
+
+### Virtual Environment (Recommended)
+If you get `externally-managed-environment` error when running `pip install`, use a virtual environment:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 ```python
 # -*- coding: utf-8 -*-
 
@@ -813,6 +822,13 @@ If you can't install `cryptography`, please try:
 `export RUSTFLAGS=" -C lto=no" && export CARGO_BUILD_TARGET="$(rustc -vV | sed -n 's|host: ||p')" && pip install cryptography`
 
 ⚠️ Installation of `pandas`, `maturin` and `cryptography` takes a long time.
+
+## Known Issues
+
+### Ads with Twitch Turbo (#787)
+If you have Twitch Turbo and run the miner from a different IP (e.g., VPN or Docker container), Twitch may still show ads when watching from your home IP. This is because Twitch associates the miner's IP with the stream session. To avoid this:
+- Run the miner from the same IP as your browser, OR
+- Use a VPN for both the miner and your browser
 
 ## Disclaimer
 This project comes with no guarantee or warranty. You are responsible for whatever happens from using this project. It is possible to get soft or hard banned by using this project if you are not careful. This is a personal project and is in no way affiliated with Twitch.
