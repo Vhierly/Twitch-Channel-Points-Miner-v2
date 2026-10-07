@@ -86,6 +86,14 @@ If you have any issues or you want to contribute, you are welcome! But please re
 - Joining the IRC Chat to increase the watch time and get StreamElements points [#47](https://github.com/Tkd-Alex/Twitch-Channel-Points-Miner-v2/issues/47) ✔️
 - [Moments](https://help.twitch.tv/s/article/moments) claiming [#182](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/182) ✔️
 - Notifying on `@nickname` mention in the Twitch chat [#227](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/227) ✔️
+- Custom time format in logs [#818](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/818) ✔️
+- Apprise notification platform support [#823](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/823) ✔️
+- Watch streak achievement notification [#775](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/775) ✔️
+- Log currently watched streamers [#724](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/724) ✔️
+- Random chat messages support [#730](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/730) ✔️
+- Enhanced drops progress bar logging [#726](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/726) ✔️
+- Monthly and yearly recap report [#797](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/797) ✔️
+- Low priority streamer list support [#742](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/742) ✔️
 
 ## Logs feature
 ### Full logs
@@ -659,6 +667,53 @@ Here's a concrete example. Let's suppose we have a bet that is opened with a tim
 - **FROM_START** with `delay=20`: The bet will be placed 20s after the bet is opened
 - **FROM_END** with `delay=20`: The bet will be placed 20s before the end of the bet (so 9mins 40s after the bet is opened)
 - **PERCENTAGE** with `delay=0.2`: The bet will be placed when the timer went down by 20% (so 2mins after the bet is opened)
+
+## New Features
+
+### Custom Time Format (#818)
+```python
+logger_settings=LoggerSettings(
+    time_format="%Y-%m-%d %H:%M:%S",  # Custom strftime format
+)
+```
+
+### Apprise Notifications (#823)
+```python
+from TwitchChannelPointsMiner.classes.Apprise import Apprise
+
+logger_settings=LoggerSettings(
+    apprise=Apprise(
+        urls="json://localhost,discord://webhook_id/webhook_token",
+        events=[Events.STREAMER_ONLINE, Events.BET_LOSE],
+    ),
+)
+```
+
+### Random Chat Messages (#730)
+```python
+streamer_settings=StreamerSettings(
+    random_messages=["Hello!", "Nice stream!", "Keep it up!"],
+    random_message_interval=300,  # seconds between messages
+)
+```
+
+### Low Priority Streamers (#742)
+```python
+# In run.py, use Priority.LOW_PRIORITY in the priority list
+priority=[Priority.STREAK, Priority.DROPS, Priority.LOW_PRIORITY]
+
+# Mark specific streamers as low priority
+Streamer("username", settings=StreamerSettings(low_priority=True))
+```
+
+### Watch Streak Notification (#775)
+Automatically logs when you achieve a watch streak (6+ minutes watched).
+
+### Drops Progress Bar (#726)
+Enhanced progress bar logging for drops, shown every 25% progress.
+
+### Monthly/Yearly Recap (#797)
+Automatically prints monthly and yearly points recap at the end of session.
 
 ## Analytics
 We have recently introduced a little frontend where you can show with a chart you points trend. The script will spawn a Flask web-server on your machine where you can select binding address and port.
