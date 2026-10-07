@@ -280,6 +280,8 @@ class TwitchChannelPointsMiner:
                                 self.username,
                                 self.twitch.twitch_login.get_auth_token(),
                                 streamer.username,
+                                random_messages=streamer.settings.random_messages,
+                                random_message_interval=streamer.settings.random_message_interval,
                             )
                         self.streamers.append(streamer)
                     except StreamerDoesNotExistException:
@@ -391,6 +393,15 @@ class TwitchChannelPointsMiner:
             refresh_context = time.time()
             while self.running:
                 time.sleep(random.uniform(20, 60))
+
+                # #730: Send random chat messages
+                for streamer in self.streamers:
+                    if (
+                        streamer.irc_chat is not None
+                        and streamer.settings.chat != ChatPresence.NEVER
+                        and streamer.settings.random_messages
+                    ):
+                        streamer.irc_chat.send_random_message()
                 # Do an external control for WebSocket. Check if the thread is running
                 # Check if is not None because maybe we have already created a new connection on array+1 and now index is None
                 for index in range(0, len(self.ws_pool.ws)):
@@ -511,3 +522,28 @@ class TwitchChannelPointsMiner:
                     f"{streamer_gain}\n{streamer_history}",
                     extra={"emoji": ":moneybag:"},
                 )
+
+        # #797: Monthly and Yearly Recap
+        self.__print_monthly_yearly_recap()
+
+    def __print_monthly_yearly_recap(self):
+        """Print monthly and yearly recap of points gained."""
+        from collections import defaultdict
+        monthly = defaultdict(int)
+        yearly = defaultdict(int)
+        for streamer in self.streamers:
+            for reason, data in streamer.history.items():
+                # We don't have timestamps in history, so we use session start as reference
+                # This is a simplified recap based on session data
+                now = datetime.now()
+                monthly[now.strftime("%Y-%m")] += data["amount"]
+                yearly[now.strftime("%Y")] += data["amount"]
+
+        print("")
+        logger.info("=== Monthly Recap ===", extra={"emoji": ":calendar:"})
+        for month, points in sorted(monthly.items()):
+            logger.info(f"  {month}: {_millify(points)} points", extra={"emoji": ":calendar:"})
+
+        logger.info("=== Yearly Recap ===", extra={"emoji": ":date:"})
+        for year, points in sorted(yearly.items()):
+            logger.info(f"  {year}: {_millify(points)} points", extra={"emoji": ":date:"})

@@ -23,6 +23,7 @@ class Stream(object):
         "payload",
         "watch_streak_missing",
         "minute_watched",
+        "watch_streak_claimed",
         "__last_update",
         "__minute_watched_timestamp",
     ]
@@ -98,6 +99,7 @@ class Stream(object):
         self.watch_streak_missing = True
         self.minute_watched = 0
         self.__minute_watched_timestamp = 0
+        self.watch_streak_claimed = False
 
     def update_minute_watched(self):
         if self.__minute_watched_timestamp != 0:

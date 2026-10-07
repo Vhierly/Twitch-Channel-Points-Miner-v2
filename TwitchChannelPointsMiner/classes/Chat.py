@@ -81,12 +81,15 @@ class ThreadChat(Thread):
     def __deepcopy__(self, memo):
         return None
 
-    def __init__(self, username, token, channel):
+    def __init__(self, username, token, channel, random_messages=None, random_message_interval=300):
         super(ThreadChat, self).__init__()
 
         self.username = username
         self.token = token
         self.channel = channel
+        self.random_messages = random_messages or []
+        self.random_message_interval = random_message_interval
+        self.__last_message_time = 0
 
         self.chat_irc = None
 
@@ -103,3 +106,18 @@ class ThreadChat(Thread):
                 f"Leave IRC Chat: {self.channel}", extra={"emoji": ":speech_balloon:"}
             )
             self.chat_irc.die()
+
+    def send_random_message(self):
+        """Send a random message from the configured list."""
+        if not self.random_messages:
+            return
+        if time.time() - self.__last_message_time < self.random_message_interval:
+            return
+        msg = self.random_messages[0] if len(self.random_messages) == 1 else self.random_messages[int(time.time()) % len(self.random_messages)]
+        try:
+            if self.chat_irc is not None and self.chat_irc.connection is not None:
+                self.chat_irc.connection.privmsg(f"#{self.channel}", msg)
+                self.__last_message_time = time.time()
+                logger.debug(f"Sent random message to #{self.channel}: {msg}")
+        except Exception as e:
+            logger.debug(f"Failed to send random message: {e}")

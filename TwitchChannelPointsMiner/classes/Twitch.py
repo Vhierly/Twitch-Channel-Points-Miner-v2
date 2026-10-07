@@ -10,6 +10,7 @@ import os
 import random
 import re
 import string
+import sys
 import time
 import requests
 import validators
@@ -92,7 +93,16 @@ class Twitch(object):
                 self.twitch_login.save_cookies(self.cookies_file)
         else:
             self.twitch_login.load_cookies(self.cookies_file)
-            self.twitch_login.set_token(self.twitch_login.get_auth_token())
+            token = self.twitch_login.get_auth_token()
+            if not token:
+                logger.error("No auth token found in cookies. Re-login required.")
+                if self.twitch_login.login_flow():
+                    self.twitch_login.save_cookies(self.cookies_file)
+                    token = self.twitch_login.get_auth_token()
+                else:
+                    logger.error("Login failed. Exiting...")
+                    sys.exit(1)
+            self.twitch_login.set_token(token)
 
     # === STREAMER / STREAM / INFO === #
     def update_stream(self, streamer):
@@ -173,6 +183,12 @@ class Twitch(object):
         json_data["variables"] = {"channel": streamer.username}
         response = self.post_gql_request(json_data)
         if response != {}:
+            if "data" not in response or response["data"] is None:
+                logger.warning(f"Invalid response from get_stream_info for {streamer.username}: {response}")
+                raise StreamerIsOfflineException
+            if "user" not in response["data"] or response["data"]["user"] is None:
+                logger.warning(f"User not found in get_stream_info for {streamer.username}: {response}")
+                raise StreamerIsOfflineException
             if response["data"]["user"]["stream"] is None:
                 raise StreamerIsOfflineException
             else:
@@ -475,7 +491,22 @@ class Twitch(object):
                         )
                         streamers_watching.update(streamers_with_multiplier[:remaining_watch_amount()])
 
+                    elif prior == Priority.LOW_PRIORITY:
+                        # #742: Low priority streamers are watched last
+                        # Only watch these if no other streamers need attention
+                        low_priority_streamers = [
+                            index
+                            for index in streamers_index
+                            if streamers[index].settings.low_priority is True
+                        ]
+                        streamers_watching.update(low_priority_streamers[:remaining_watch_amount()])
+
                 streamers_watching = list(streamers_watching)[:max_watch_amount]
+
+                # #724: Log current watched streamers
+                if streamers_watching:
+                    watched_names = [streamers[i].username for i in streamers_watching]
+                    logger.debug(f"Currently watching: {', '.join(watched_names)}")
 
                 for index in streamers_watching:
                     # next_iteration = time.time() + 60 / len(streamers_watching)
@@ -593,6 +624,21 @@ class Twitch(object):
                         if response.status_code == 204:
                             streamers[index].stream.update_minute_watched()
 
+                            # #775: Watch streak notification
+                            if (
+                                streamers[index].stream.watch_streak_claimed is False
+                                and streamers[index].stream.minute_watched >= 6
+                                and streamers[index].stream.watch_streak_missing is True
+                            ):
+                                streamers[index].stream.watch_streak_claimed = True
+                                logger.info(
+                                    f"Watch streak achieved for {streamers[index]}! ({streamers[index].stream.minute_watched} minutes watched)",
+                                    extra={
+                                        "emoji": ":fire:",
+                                        "event": Events.GAIN_FOR_WATCH_STREAK,
+                                    },
+                                )
+
                             """
                             Remember, you can only earn progress towards a time-based Drop on one participating channel at a time.  [ ! ! ! ]
                             You can also check your progress towards Drops within a campaign anytime by viewing the Drops Inventory.
@@ -645,6 +691,32 @@ class Twitch(object):
                                             Settings.logger.gotify.send(
                                                 "\n".join(drop_messages),
                                                 Events.DROP_STATUS,
+                                            )
+
+                            # Fix #811: Track drops progress even when claim_drops is False
+                            # Twitch still counts progress on their side, so we should sync it
+                            if streamers[index].settings.claim_drops is False:
+                                try:
+                                    self.__sync_campaigns(streamers[index].stream.campaigns)
+                                except Exception:
+                                    pass
+
+                            # #726: Enhanced drops progress bar logging
+                            if streamers[index].stream.campaigns:
+                                for campaign in streamers[index].stream.campaigns:
+                                    for drop in campaign.drops:
+                                        if drop.is_printable:
+                                            logger.info(
+                                                f"Drop progress for {streamers[index]}: {drop.progress_bar()}",
+                                                extra={
+                                                    "emoji": ":bar_chart:",
+                                                    "event": Events.DROP_STATUS,
+                                                    "skip_telegram": True,
+                                                    "skip_discord": True,
+                                                    "skip_webhook": True,
+                                                    "skip_matrix": True,
+                                                    "skip_gotify": True,
+                                                },
                                             )
 
                     except requests.exceptions.ConnectionError as e:

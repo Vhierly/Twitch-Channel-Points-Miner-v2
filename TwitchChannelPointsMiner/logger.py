@@ -18,6 +18,7 @@ from TwitchChannelPointsMiner.classes.Settings import Events
 from TwitchChannelPointsMiner.classes.Telegram import Telegram
 from TwitchChannelPointsMiner.classes.Pushover import Pushover
 from TwitchChannelPointsMiner.classes.Gotify import Gotify
+from TwitchChannelPointsMiner.classes.Apprise import Apprise
 from TwitchChannelPointsMiner.utils import remove_emoji
 
 
@@ -81,7 +82,9 @@ class LoggerSettings:
         "matrix",
         "pushover",
         "gotify",
-        "username"
+        "apprise",
+        "username",
+        "time_format"
     ]
 
     def __init__(
@@ -102,7 +105,9 @@ class LoggerSettings:
         matrix: Matrix or None = None,
         pushover: Pushover or None = None,
         gotify: Gotify or None = None,
-        username: str or None = None
+        apprise: Apprise or None = None,
+        username: str or None = None,
+        time_format: str or None = None
     ):
         self.save = save
         self.less = less
@@ -120,7 +125,9 @@ class LoggerSettings:
         self.matrix = matrix
         self.pushover = pushover
         self.gotify = gotify
+        self.apprise = apprise
         self.username = username
+        self.time_format = time_format
 
 
 class FileFormatter(logging.Formatter):
@@ -197,6 +204,7 @@ class GlobalFormatter(logging.Formatter):
             self.matrix(record)
             self.pushover(record)
             self.gotify(record)
+            self.apprise(record)
 
             if self.settings.colored is True:
                 record.msg = (
@@ -276,6 +284,16 @@ class GlobalFormatter(logging.Formatter):
         ):
             self.settings.gotify.send(record.msg, record.event)
 
+    def apprise(self, record):
+        skip_apprise = False if hasattr(
+            record, "skip_apprise") is False else True
+
+        if (
+            self.settings.apprise is not None
+            and skip_apprise is False
+        ):
+            self.settings.apprise.send(record.msg, record.event)
+
 
 def configure_loggers(username, settings):
     if settings.colored is True:
@@ -297,6 +315,9 @@ def configure_loggers(username, settings):
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(settings.console_level)
+    console_datefmt = settings.time_format or (
+        "%d/%m/%y %H:%M:%S" if settings.less is False else "%d/%m %H:%M:%S"
+    )
     console_handler.setFormatter(
         GlobalFormatter(
             fmt=(
@@ -304,9 +325,7 @@ def configure_loggers(username, settings):
                 if settings.less is False
                 else "%(asctime)s - %(message)s"
             ),
-            datefmt=(
-                "%d/%m/%y %H:%M:%S" if settings.less is False else "%d/%m %H:%M:%S"
-            ),
+            datefmt=console_datefmt,
             settings=settings,
         )
     )
@@ -339,7 +358,7 @@ def configure_loggers(username, settings):
         file_handler.setFormatter(
             FileFormatter(
                 fmt="%(asctime)s - %(levelname)s - %(name)s - [%(funcName)s]: %(message)s",
-                datefmt="%d/%m/%y %H:%M:%S",
+                datefmt=settings.time_format or "%d/%m/%y %H:%M:%S",
                 settings=settings
             )
         )
