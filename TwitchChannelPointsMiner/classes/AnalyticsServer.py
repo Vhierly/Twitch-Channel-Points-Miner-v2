@@ -330,8 +330,17 @@ fetch('/api/watching').then(r => r.json()).then(data => {
         """#678: API endpoint returning currently watched streamers."""
         from TwitchChannelPointsMiner.classes.Settings import Settings
         streamers = []
-        # Access the miner's streamers through Settings or global state
-        # For now, return empty list - will be populated when miner is running
+        # Access the miner's streamers through global state
+        miner = getattr(Settings, '_miner_instance', None)
+        if miner is not None and hasattr(miner, 'streamers'):
+            for s in miner.streamers:
+                streamers.append({
+                    "username": s.username,
+                    "is_online": s.is_online,
+                    "channel_points": s.channel_points,
+                    "title": s.stream.title if s.stream else None,
+                    "game": s.stream.game_name() if s.stream else None,
+                })
         return Response(
             json.dumps(streamers),
             status=200,

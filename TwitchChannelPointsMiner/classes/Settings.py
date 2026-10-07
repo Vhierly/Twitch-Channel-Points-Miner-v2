@@ -24,7 +24,7 @@ class FollowersOrder(Enum):
 class Settings(object):
     __slots__ = ["logger", "streamer_settings",
                  "enable_analytics", "disable_ssl_cert_verification", "disable_at_in_nickname",
-                 "max_watch_amount"]
+                 "max_watch_amount", "_miner_instance"]
 
 
 class Events(Enum):

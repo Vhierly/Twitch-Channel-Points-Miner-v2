@@ -45,8 +45,8 @@ twitch_miner = TwitchChannelPointsMiner(
     priority=[Priority.STREAK, Priority.DROPS, Priority.ORDER],
     logger_settings=LoggerSettings(
         save=True,
-        console_level=10,  # DEBUG
-        less=False,
+        console_level=20,  # INFO
+        less=True,         # Simple log format
         colored=True,
     ),
     streamer_settings=StreamerSettings(

@@ -71,6 +71,8 @@ class TwitchChannelPointsMiner:
         "original_streamers",
         "logs_file",
         "queue_listener",
+        "_pending_additions",
+        "_pending_removals",
     ]
 
     def __init__(
@@ -102,6 +104,9 @@ class TwitchChannelPointsMiner:
 
         # #618: Configurable max watch amount (default: 2, Twitch limit)
         Settings.max_watch_amount = 2
+
+        # Store miner instance for AnalyticsServer access
+        Settings._miner_instance = self
 
         self.proxy = proxy
 
@@ -358,6 +363,10 @@ class TwitchChannelPointsMiner:
                 streamer.channel_points for streamer in self.streamers
             ]
 
+            # #639: Runtime streamer changes
+            self._pending_additions = []
+            self._pending_removals = []
+
             # If we have at least one streamer with settings = make_predictions True
             make_predictions = at_least_one_value_in_settings_is(
                 self.streamers, "make_predictions", True
@@ -533,6 +542,59 @@ class TwitchChannelPointsMiner:
         self.queue_listener.stop()
 
         sys.exit(0)
+
+    def add_streamer(self, streamer):
+        """#639: Add a streamer at runtime."""
+        if isinstance(streamer, str):
+            streamer = Streamer(streamer)
+        self._pending_additions.append(streamer)
+
+    def remove_streamer(self, username):
+        """#639: Remove a streamer at runtime."""
+        self._pending_removals.append(username.lower().strip())
+
+    def __process_runtime_streamer_changes(self):
+        """#639: Process pending streamer additions and removals."""
+        # Process removals
+        for username in self._pending_removals:
+            for i, s in enumerate(self.streamers):
+                if s.username == username:
+                    logger.info(f"Removing streamer {username} at runtime")
+                    if s.irc_chat is not None:
+                        s.leave_chat()
+                    self.streamers.pop(i)
+                    break
+        self._pending_removals.clear()
+
+        # Process additions
+        for streamer in self._pending_additions:
+            username = streamer.username
+            # Check if already exists
+            if any(s.username == username for s in self.streamers):
+                continue
+            try:
+                streamer.channel_id = self.twitch.get_channel_id(username)
+                streamer.settings = set_default_settings(
+                    streamer.settings, Settings.streamer_settings
+                )
+                streamer.settings.bet = set_default_settings(
+                    streamer.settings.bet, Settings.streamer_settings.bet
+                )
+                if streamer.settings.chat != ChatPresence.NEVER:
+                    streamer.irc_chat = ThreadChat(
+                        self.username,
+                        self.twitch.twitch_login.get_auth_token(),
+                        streamer.username,
+                        random_messages=streamer.settings.random_messages,
+                        random_message_interval=streamer.settings.random_message_interval,
+                    )
+                self.twitch.load_channel_points_context(streamer)
+                self.twitch.check_streamer_online(streamer)
+                self.streamers.append(streamer)
+                logger.info(f"Added streamer {username} at runtime")
+            except Exception as e:
+                logger.error(f"Failed to add streamer {username}: {e}")
+        self._pending_additions.clear()
 
     def __print_report(self):
         print("\n")
