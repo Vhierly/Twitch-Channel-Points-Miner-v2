@@ -17,6 +17,7 @@ from TwitchChannelPointsMiner.classes.Exceptions import (
     BadCredentialsException,
     WrongCookiesException,
 )
+from TwitchChannelPointsMiner.classes.Settings import Settings
 from TwitchChannelPointsMiner.constants import CLIENT_ID, GQLOperations, USER_AGENTS
 
 from datetime import datetime, timedelta, timezone

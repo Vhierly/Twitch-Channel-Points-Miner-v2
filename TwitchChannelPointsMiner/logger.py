@@ -232,6 +232,9 @@ class GlobalFormatter(logging.Formatter):
             self.settings.discord is not None
             and skip_discord is False
             and self.settings.discord.webhook_api
+            and self.settings.discord.webhook_api
+            != ["https://discord.com/api/webhooks/0123456789/0a1B2c3D4e5F6g7H8i9J"]
+            and self.settings.discord.webhook_api
             != "https://discord.com/api/webhooks/0123456789/0a1B2c3D4e5F6g7H8i9J"
         ):
             self.settings.discord.send(record.msg, record.event)

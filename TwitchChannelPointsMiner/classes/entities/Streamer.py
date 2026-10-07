@@ -28,6 +28,9 @@ class StreamerSettings(object):
         "random_messages",
         "random_message_interval",
         "low_priority",
+        "favorite",
+        "greeting_message",
+        "auto_buy",
     ]
 
     def __init__(
@@ -43,6 +46,9 @@ class StreamerSettings(object):
         random_messages: list = None,
         random_message_interval: int = None,
         low_priority: bool = None,
+        favorite: bool = None,
+        greeting_message: str = None,
+        auto_buy: bool = None,
     ):
         self.make_predictions = make_predictions
         self.follow_raid = follow_raid
@@ -55,6 +61,9 @@ class StreamerSettings(object):
         self.random_messages = random_messages
         self.random_message_interval = random_message_interval
         self.low_priority = low_priority
+        self.favorite = favorite
+        self.greeting_message = greeting_message
+        self.auto_buy = auto_buy
 
     def default(self):
         for name in [
@@ -78,9 +87,15 @@ class StreamerSettings(object):
             self.random_message_interval = 300
         if self.low_priority is None:
             self.low_priority = False
+        if self.favorite is None:
+            self.favorite = False
+        if self.greeting_message is None:
+            self.greeting_message = ""
+        if self.auto_buy is None:
+            self.auto_buy = False
 
     def __repr__(self):
-        return f"StreamerSettings(make_predictions={self.make_predictions}, follow_raid={self.follow_raid}, claim_drops={self.claim_drops}, claim_moments={self.claim_moments}, watch_streak={self.watch_streak}, community_goals={self.community_goals}, bet={self.bet}, chat={self.chat}, random_messages={self.random_messages}, random_message_interval={self.random_message_interval}, low_priority={self.low_priority})"
+        return f"StreamerSettings(make_predictions={self.make_predictions}, follow_raid={self.follow_raid}, claim_drops={self.claim_drops}, claim_moments={self.claim_moments}, watch_streak={self.watch_streak}, community_goals={self.community_goals}, bet={self.bet}, chat={self.chat}, random_messages={self.random_messages}, random_message_interval={self.random_message_interval}, low_priority={self.low_priority}, favorite={self.favorite}, greeting_message={self.greeting_message}, auto_buy={self.auto_buy})"
 
 
 class Streamer(object):

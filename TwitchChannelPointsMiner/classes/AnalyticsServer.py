@@ -247,7 +247,7 @@ class AnalyticsServer(Thread):
             global last_sent_log_index  # Use the global variable
 
             # Get the last received log index from the client request parameters
-            last_received_index = int(request.args.get("lastIndex", last_sent_log_index))
+            last_received_index = int(request.args.get("lastIndex", last_sent_log_index) or last_sent_log_index)
 
             logs_path = os.path.join(Path().absolute(), "logs")
             log_file_path = os.path.join(logs_path, f"{username}.log")

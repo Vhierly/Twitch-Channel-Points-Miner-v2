@@ -296,7 +296,7 @@ class Bet(object):
         elif self.settings.strategy == Strategy.PERCENTAGE:
             self.decision["choice"] = self.__return_choice(OutcomeKeys.ODDS_PERCENTAGE)
         elif self.settings.strategy == Strategy.SMART_MONEY:
-            self.decision["choice"] = self.__return_choice(OutcomeKeys.TOP_POINTS)
+            self.decision["choice"] = self.__return_choice(OutcomeKeys.TOTAL_POINTS)
         elif self.settings.strategy == Strategy.NUMBER_1:
             self.decision["choice"] = self.__return_number_choice(0)
         elif self.settings.strategy == Strategy.NUMBER_2:

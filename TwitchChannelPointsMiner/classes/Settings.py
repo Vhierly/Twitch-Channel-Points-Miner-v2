@@ -9,6 +9,7 @@ class Priority(Enum):
     POINTS_ASCENDING = auto()
     POINTS_DESCENDING = auto()
     LOW_PRIORITY = auto()
+    FAVORITE = auto()
 
 
 class FollowersOrder(Enum):

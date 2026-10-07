@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -216,6 +217,7 @@ class TwitchChannelPointsMiner:
         blacklist: list = [],
         followers: bool = False,
         followers_order: FollowersOrder = FollowersOrder.ASC,
+        games: list = [],
     ):
         if self.running:
             logger.error("You can't start multiple sessions of this instance!")
@@ -255,40 +257,63 @@ class TwitchChannelPointsMiner:
                         streamers_name.append(username)
                         streamers_dict[username] = username.lower().strip()
 
+            # #621: Mine by game category instead of by streamer name
+            if games:
+                game_streamers = self.twitch.get_streamers_by_game(games)
+                logger.info(
+                    f"Found {len(game_streamers)} streamers for games: {', '.join(games)}",
+                    extra={"emoji": ":video_game:"},
+                )
+                for username in game_streamers:
+                    if username not in streamers_dict and username not in blacklist:
+                        streamers_name.append(username)
+                        streamers_dict[username] = username.lower().strip()
+
             logger.info(
                 f"Loading data for {len(streamers_name)} streamers. Please wait...",
                 extra={"emoji": ":nerd_face:"},
             )
-            for username in streamers_name:
-                if username in streamers_name:
-                    time.sleep(random.uniform(0.3, 0.7))
-                    try:
-                        streamer = (
-                            streamers_dict[username]
-                            if isinstance(streamers_dict[username], Streamer) is True
-                            else Streamer(username)
+
+            # #629: Asynchronously Get Streamer Data on Startup using ThreadPoolExecutor
+            def _load_streamer_data(username):
+                try:
+                    streamer = (
+                        streamers_dict[username]
+                        if isinstance(streamers_dict[username], Streamer) is True
+                        else Streamer(username)
+                    )
+                    streamer.channel_id = self.twitch.get_channel_id(username)
+                    streamer.settings = set_default_settings(
+                        streamer.settings, Settings.streamer_settings
+                    )
+                    streamer.settings.bet = set_default_settings(
+                        streamer.settings.bet, Settings.streamer_settings.bet
+                    )
+                    if streamer.settings.chat != ChatPresence.NEVER:
+                        streamer.irc_chat = ThreadChat(
+                            self.username,
+                            self.twitch.twitch_login.get_auth_token(),
+                            streamer.username,
+                            random_messages=streamer.settings.random_messages,
+                            random_message_interval=streamer.settings.random_message_interval,
                         )
-                        streamer.channel_id = self.twitch.get_channel_id(username)
-                        streamer.settings = set_default_settings(
-                            streamer.settings, Settings.streamer_settings
-                        )
-                        streamer.settings.bet = set_default_settings(
-                            streamer.settings.bet, Settings.streamer_settings.bet
-                        )
-                        if streamer.settings.chat != ChatPresence.NEVER:
-                            streamer.irc_chat = ThreadChat(
-                                self.username,
-                                self.twitch.twitch_login.get_auth_token(),
-                                streamer.username,
-                                random_messages=streamer.settings.random_messages,
-                                random_message_interval=streamer.settings.random_message_interval,
-                            )
+                    return streamer
+                except StreamerDoesNotExistException:
+                    logger.info(
+                        f"Streamer {username} does not exist",
+                        extra={"emoji": ":cry:"},
+                    )
+                    return None
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                future_to_username = {
+                    executor.submit(_load_streamer_data, username): username
+                    for username in streamers_name
+                }
+                for future in as_completed(future_to_username):
+                    streamer = future.result()
+                    if streamer is not None:
                         self.streamers.append(streamer)
-                    except StreamerDoesNotExistException:
-                        logger.info(
-                            f"Streamer {username} does not exist",
-                            extra={"emoji": ":cry:"},
-                        )
 
             # Populate the streamers with default values.
             # 1. Load channel points and auto-claim bonus
@@ -394,6 +419,10 @@ class TwitchChannelPointsMiner:
             while self.running:
                 time.sleep(random.uniform(20, 60))
 
+                # #639: Add/remove streamer on runtime
+                # Process pending streamer additions/removals
+                self.__process_runtime_streamer_changes()
+
                 # #730: Send random chat messages
                 for streamer in self.streamers:
                     if (
@@ -402,6 +431,26 @@ class TwitchChannelPointsMiner:
                         and streamer.settings.random_messages
                     ):
                         streamer.irc_chat.send_random_message()
+
+                # #654: Send greeting message when streamer comes online
+                for streamer in self.streamers:
+                    if (
+                        streamer.irc_chat is not None
+                        and streamer.settings.greeting_message
+                        and streamer.is_online
+                    ):
+                        if getattr(streamer, '_greeting_sent', False) is False:
+                            streamer.irc_chat.send_greeting(streamer.settings.greeting_message)
+                            streamer._greeting_sent = True
+                    else:
+                        if hasattr(streamer, '_greeting_sent'):
+                            streamer._greeting_sent = False
+
+                # #794: Auto buy channel points items
+                for streamer in self.streamers:
+                    if streamer.is_online and streamer.settings.auto_buy is True:
+                        self.twitch.check_and_auto_buy(streamer)
+
                 # Do an external control for WebSocket. Check if the thread is running
                 # Check if is not None because maybe we have already created a new connection on array+1 and now index is None
                 for index in range(0, len(self.ws_pool.ws)):

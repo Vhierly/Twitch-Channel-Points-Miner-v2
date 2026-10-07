@@ -121,3 +121,14 @@ class ThreadChat(Thread):
                 logger.debug(f"Sent random message to #{self.channel}: {msg}")
         except Exception as e:
             logger.debug(f"Failed to send random message: {e}")
+
+    def send_greeting(self, greeting_message: str):
+        """Send a greeting message to the chat channel."""
+        if not greeting_message:
+            return
+        try:
+            if self.chat_irc is not None and self.chat_irc.connection is not None:
+                self.chat_irc.connection.privmsg(f"#{self.channel}", greeting_message)
+                logger.debug(f"Sent greeting to #{self.channel}: {greeting_message}")
+        except Exception as e:
+            logger.debug(f"Failed to send greeting: {e}")

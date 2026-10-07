@@ -10,6 +10,7 @@ from random import randrange
 import requests
 from millify import millify
 
+from TwitchChannelPointsMiner.classes.Settings import Settings
 from TwitchChannelPointsMiner.constants import USER_AGENTS, GITHUB_url
 
 
@@ -157,7 +158,7 @@ def internet_connection_available(host="8.8.8.8", port=53, timeout=3):
 
 
 def percentage(a, b):
-    return 0 if a == 0 else int((a / b) * 100)
+    return 0 if a == 0 or b == 0 else int((a / b) * 100)
 
 
 def create_chunks(lst, n):

@@ -228,3 +228,22 @@ class GQLOperations:
             }
         }
     }
+    ChannelPointsStore = {
+        "operationName": "ChannelPointsStore",
+        "variables": {"channelLogin": None},
+        "extensions": {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "28c1a3c4c1f44b7b1f24b77e4b1e2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+            }
+        }
+    }
+    PurchaseChannelPointsItem = {
+        "operationName": "PurchaseChannelPointsItem",
+        "extensions": {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5"
+            }
+        }
+    }

@@ -65,6 +65,7 @@ class Twitch(object):
         "client_session",
         "client_version",
         "twilight_build_id_pattern",
+        "_connection_error_logged",
     ]
 
     def __init__(self, username, user_agent, password=None):
@@ -79,6 +80,7 @@ class Twitch(object):
             CLIENT_ID, self.device_id, username, self.user_agent, password=password
         )
         self.running = True
+        self._connection_error_logged = False
         # self.integrity = None
         # self.integrity_expire = 0
         self.client_session = token_hex(16)
@@ -151,19 +153,19 @@ class Twitch(object):
             headers = {"User-Agent": USER_AGENTS["Linux"]["FIREFOX"]}
 
             main_page_request = requests.get(
-                streamer.streamer_url, headers=headers)
+                streamer.streamer_url, headers=headers, timeout=15, verify=not Settings.disable_ssl_cert_verification)
             response = main_page_request.text
             # logger.info(response)
             regex_settings = "(https://static.twitchcdn.net/config/settings.*?js|https://assets.twitch.tv/config/settings.*?.js)"
             settings_url = re.search(regex_settings, response).group(1)
 
-            settings_request = requests.get(settings_url, headers=headers)
+            settings_request = requests.get(settings_url, headers=headers, timeout=15, verify=not Settings.disable_ssl_cert_verification)
             response = settings_request.text
             regex_spade = '"spade_url":"(.*?)"'
             streamer.stream.spade_url = re.search(
                 regex_spade, response).group(1)
         except requests.exceptions.RequestException as e:
-            logger.error(
+            logger.warning(
                 f"Something went wrong during extraction of 'spade_url': {e}")
 
     def get_broadcast_id(self, streamer):
@@ -290,29 +292,57 @@ class Twitch(object):
             self.__chuncked_sleep(random_sleep * 60, chunk_size=chunk_size)
 
     def post_gql_request(self, json_data):
-        try:
-            response = requests.post(
-                GQLOperations.url,
-                json=json_data,
-                headers={
-                    "Authorization": f"OAuth {self.twitch_login.get_auth_token()}",
-                    "Client-Id": CLIENT_ID,
-                    # "Client-Integrity": self.post_integrity(),
-                    "Client-Session-Id": self.client_session,
-                    "Client-Version": self.update_client_version(),
-                    "User-Agent": self.user_agent,
-                    "X-Device-Id": self.device_id,
-                },
-            )
-            logger.debug(
-                f"Data: {json_data}, Status code: {response.status_code}, Content: {response.text}"
-            )
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(
-                f"Error with GQLOperations ({json_data['operationName']}): {e}"
-            )
-            return {}
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    GQLOperations.url,
+                    json=json_data,
+                    headers={
+                        "Authorization": f"OAuth {self.twitch_login.get_auth_token()}",
+                        "Client-Id": CLIENT_ID,
+                        # "Client-Integrity": self.post_integrity(),
+                        "Client-Session-Id": self.client_session,
+                        "Client-Version": self.update_client_version(),
+                        "User-Agent": self.user_agent,
+                        "X-Device-Id": self.device_id,
+                    },
+                    timeout=15,
+                    verify=not Settings.disable_ssl_cert_verification,
+                )
+                logger.debug(
+                    f"Data: {json_data}, Status code: {response.status_code}, Content: {response.text}"
+                )
+                return response.json()
+            except requests.exceptions.ConnectionError as e:
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 5
+                    logger.warning(
+                        f"Connection error with GQLOperations ({json_data['operationName']}): {e}. Retrying in {wait_time}s..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.warning(
+                        f"Connection error with GQLOperations ({json_data['operationName']}): {e}"
+                    )
+                    return {}
+            except requests.exceptions.Timeout as e:
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 5
+                    logger.warning(
+                        f"Timeout with GQLOperations ({json_data['operationName']}): {e}. Retrying in {wait_time}s..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.warning(
+                        f"Timeout with GQLOperations ({json_data['operationName']}): {e}"
+                    )
+                    return {}
+            except requests.exceptions.RequestException as e:
+                logger.warning(
+                    f"Error with GQLOperations ({json_data['operationName']}): {e}"
+                )
+                return {}
 
     # Request for Integrity Token
     # Twitch needs Authorization, Client-Id, X-Device-Id to generate JWT which is used for authorize gql requests
@@ -372,7 +402,7 @@ class Twitch(object):
 
     def update_client_version(self):
         try:
-            response = requests.get(URL)
+            response = requests.get(URL, timeout=10, verify=not Settings.disable_ssl_cert_verification)
             if response.status_code != 200:
                 logger.debug(
                     f"Error with update_client_version: {response.status_code}"
@@ -385,8 +415,8 @@ class Twitch(object):
             self.client_version = matcher.group(1)
             logger.debug(f"Client version: {self.client_version}")
             return self.client_version
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error with update_client_version: {e}")
+        except Exception as e:
+            logger.debug(f"Error with update_client_version: {e}")
             return self.client_version
 
     def send_minute_watched_events(self, streamers, priority, chunk_size=3):
@@ -566,6 +596,7 @@ class Twitch(object):
                             RequestBroadcastQualitiesURL,
                             headers={"User-Agent": self.user_agent},
                             timeout=20,
+                            verify=not Settings.disable_ssl_cert_verification,
                         )  # timeout=60
                         logger.debug(
                             f"Send RequestBroadcastQualitiesURL request for {streamers[index]} - Status code: {responseBroadcastQualities.status_code}"
@@ -585,6 +616,7 @@ class Twitch(object):
                             BroadcastLowestQualityURL,
                             headers={"User-Agent": self.user_agent},
                             timeout=20,
+                            verify=not Settings.disable_ssl_cert_verification,
                         )  # timeout=60
                         logger.debug(
                             f"Send BroadcastLowestQualityURL request for {streamers[index]} - Status code: {responseStreamURLList.status_code}"
@@ -720,12 +752,21 @@ class Twitch(object):
                                             )
 
                     except requests.exceptions.ConnectionError as e:
-                        logger.error(
-                            f"Error while trying to send minute watched: {e}")
+                        if not self._connection_error_logged:
+                            logger.warning(
+                                f"Connection error while trying to send minute watched: {e}")
+                            self._connection_error_logged = True
                         self.__check_connection_handler(chunk_size)
                     except requests.exceptions.Timeout as e:
-                        logger.error(
-                            f"Error while trying to send minute watched: {e}")
+                        if not self._connection_error_logged:
+                            logger.warning(
+                                f"Timeout while trying to send minute watched: {e}")
+                            self._connection_error_logged = True
+                    except requests.exceptions.RequestException as e:
+                        if not self._connection_error_logged:
+                            logger.warning(
+                                f"Error while trying to send minute watched: {e}")
+                            self._connection_error_logged = True
 
                     self.__chuncked_sleep(
                         next_iteration - time.time(), chunk_size=chunk_size
@@ -821,9 +862,19 @@ class Twitch(object):
                         }
                     }
                     response = self.post_gql_request(json_data)
-                    if (
+                    if response == {}:
+                        logger.error(
+                            "Failed to place bet: empty response from Twitch",
+                            extra={
+                                "emoji": ":four_leaf_clover:",
+                                "event": Events.BET_FAILED,
+                            },
+                        )
+                    elif (
                         "data" in response
+                        and response["data"] is not None
                         and "makePrediction" in response["data"]
+                        and response["data"]["makePrediction"] is not None
                         and "error" in response["data"]["makePrediction"]
                         and response["data"]["makePrediction"]["error"] is not None
                     ):
@@ -1129,7 +1180,7 @@ class Twitch(object):
                 "amount": amount,
                 "channelID": streamer.channel_id,
                 "goalID": goal_id,
-                "transactionID": token_hex(16),
+                "transactionID": token_hex(16)
             }
         }
 
@@ -1145,3 +1196,57 @@ class Twitch(object):
                 f"Contributed {amount} channel points to community goal '{title}'"
             )
             streamer.channel_points -= amount
+
+    # === AUTO BUY === #
+    def get_channel_points_store(self, streamer):
+        """Get the channel points store (available items to buy) for a streamer."""
+        json_data = copy.deepcopy(GQLOperations.ChannelPointsStore)
+        json_data["variables"] = {"channelLogin": streamer.username}
+        response = self.post_gql_request(json_data)
+        try:
+            if response and "data" in response and response["data"]:
+                return response["data"].get("community", {}).get("channel", {}).get("self", {}).get("communityPoints", {}).get("store", {})
+        except (ValueError, KeyError, TypeError):
+            pass
+        return {}
+
+    def auto_buy_item(self, streamer, item_id, cost):
+        """Purchase an item from the channel points store using channel points."""
+        json_data = copy.deepcopy(GQLOperations.PurchaseChannelPointsItem)
+        json_data["variables"] = {
+            "input": {
+                "channelID": streamer.channel_id,
+                "itemID": item_id,
+                "cost": cost,
+                "transactionID": token_hex(16)
+            }
+        }
+        response = self.post_gql_request(json_data)
+        try:
+            if response and "data" in response and response["data"]:
+                purchase = response["data"].get("purchaseChannelPointsItem", {})
+                if purchase and purchase.get("error"):
+                    logger.error(
+                        f"Failed to auto-buy item {item_id} for {streamer}: {purchase['error']}"
+                    )
+                    return False
+                logger.info(
+                    f"Auto-bought item {item_id} for {streamer} (cost: {cost} points)",
+                    extra={"emoji": ":shopping_cart:"}
+                )
+                return True
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error during auto-buy for {streamer}: {e}")
+        return False
+
+    def check_and_auto_buy(self, streamer):
+        """Check available items in the store and auto-buy if enabled."""
+        if streamer.settings.auto_buy is not True:
+            return
+        store = self.get_channel_points_store(streamer)
+        if not store:
+            return
+        items = store.get("items", [])
+        for item in items:
+            if item.get("isAvailable") and item.get("cost", 0) <= streamer.channel_points:
+                self.auto_buy_item(streamer, item["id"], item["cost"])
