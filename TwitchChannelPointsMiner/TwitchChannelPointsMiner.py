@@ -327,17 +327,32 @@ class TwitchChannelPointsMiner:
             # 1. Load channel points and auto-claim bonus
             # 2. Check if streamers are online
             # 3. DEACTIVATED: Check if the user is a moderator. (was used before the 5th of April 2021 to deactivate predictions)
-            for streamer in self.streamers:
-                time.sleep(random.uniform(0.3, 0.7))
+            # #779: Parallelize the second startup loop to speed up initialization
+            def _hydrate_streamer(streamer):
                 try:
+                    time.sleep(random.uniform(0.3, 0.7))
                     self.twitch.load_channel_points_context(streamer)
                     self.twitch.check_streamer_online(streamer)
                     # self.twitch.viewer_is_mod(streamer)
+                    return streamer
                 except StreamerDoesNotExistException:
                     logger.info(
                         f"Streamer {streamer.username} does not exist",
                         extra={"emoji": ":cry:"},
                     )
+                    return None
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                future_to_streamer = {
+                    executor.submit(_hydrate_streamer, streamer): streamer
+                    for streamer in self.streamers
+                }
+                hydrated = []
+                for future in as_completed(future_to_streamer):
+                    result = future.result()
+                    if result is not None:
+                        hydrated.append(result)
+                self.streamers = hydrated
 
             self.original_streamers = [
                 streamer.channel_points for streamer in self.streamers

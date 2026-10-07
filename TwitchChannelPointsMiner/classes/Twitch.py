@@ -71,6 +71,7 @@ class Twitch(object):
         "_stream_url_cache",
         "_stream_url_cache_time",
         "_stream_url_cache_ttl",
+        "_client_version_cache_time",
     ]
 
     def __init__(self, username, user_agent, password=None, proxy=None):
@@ -101,6 +102,8 @@ class Twitch(object):
         self._stream_url_cache = {}
         self._stream_url_cache_time = 0
         self._stream_url_cache_ttl = 300  # 5 minutes cache
+        # #779: Cache Client-Version to avoid HTTP GET on every GQL request
+        self._client_version_cache_time = 0
 
     def login(self):
         if not os.path.isfile(self.cookies_file):
@@ -481,6 +484,10 @@ class Twitch(object):
             return False"""
 
     def update_client_version(self):
+        # #779: Use TTL cache to avoid HTTP GET on every GQL request
+        # Refresh at most once every 5 minutes
+        if self._client_version_cache_time > 0 and (time.time() - self._client_version_cache_time) < 300:
+            return self.client_version
         try:
             response = requests.get(URL, timeout=10, verify=not Settings.disable_ssl_cert_verification)
             if response.status_code != 200:
@@ -493,6 +500,7 @@ class Twitch(object):
                 logger.debug("Error with update_client_version: no match")
                 return self.client_version
             self.client_version = matcher.group(1)
+            self._client_version_cache_time = time.time()
             logger.debug(f"Client version: {self.client_version}")
             return self.client_version
         except Exception as e:
@@ -769,6 +777,9 @@ class Twitch(object):
                                 and streamers[index].stream.watch_streak_missing is True
                             ):
                                 streamers[index].stream.watch_streak_claimed = True
+                                # #782: Mark streak as no longer missing so the streamer
+                                # is not perpetually re-added to the watch list
+                                streamers[index].stream.watch_streak_missing = False
                                 logger.info(
                                     f"Watch streak achieved for {streamers[index]}! ({streamers[index].stream.minute_watched} minutes watched)",
                                     extra={
@@ -1147,6 +1158,13 @@ class Twitch(object):
             "input": {"dropInstanceID": drop.drop_instance_id}}
         response = self.post_gql_request(json_data)
         try:
+            # #597/#700: Handle None response data gracefully
+            if response is None or response.get("data") is None:
+                logger.warning(
+                    f"Cannot claim {drop} - no data in response",
+                    extra={"emoji": ":warning:", "event": Events.DROP_CLAIM}
+                )
+                return False
             # response["data"]["claimDropRewards"] can be null and respose["data"]["errors"] != []
             # or response["data"]["claimDropRewards"]["status"] === DROP_INSTANCE_ALREADY_CLAIMED
             if ("claimDropRewards" in response["data"]) and (
@@ -1162,7 +1180,7 @@ class Twitch(object):
                 return True
             else:
                 return False
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError):
             return False
 
     def claim_all_drops_from_inventory(self):
@@ -1171,17 +1189,21 @@ class Twitch(object):
             if inventory["dropCampaignsInProgress"] not in [None, {}]:
                 for campaign in inventory["dropCampaignsInProgress"]:
                     for drop_dict in campaign["timeBasedDrops"]:
-                        drop = Drop(drop_dict)
-                        drop.update(drop_dict["self"])
-                        if drop.is_claimable is True:
-                            # Skip drops that need a connected account we don't have
-                            if drop.has_preconditions_met is False:
-                                logger.debug(
-                                    f"Skipping inventory claim for {drop.name} - preconditions not met"
-                                )
-                                continue
-                            drop.is_claimed = self.claim_drop(drop)
-                            time.sleep(random.uniform(5, 10))
+                        try:
+                            drop = Drop(drop_dict)
+                            drop.update(drop_dict["self"])
+                            if drop.is_claimable is True:
+                                # Skip drops that need a connected account we don't have
+                                if drop.has_preconditions_met is False:
+                                    logger.debug(
+                                        f"Skipping inventory claim for {drop.name} - preconditions not met"
+                                    )
+                                    continue
+                                drop.is_claimed = self.claim_drop(drop)
+                                time.sleep(random.uniform(5, 10))
+                        except Exception as e:
+                            logger.warning(f"Error processing drop from inventory: {e}")
+                            continue
 
     def sync_campaigns(self, streamers, chunk_size=3):
         campaigns_update = 0
