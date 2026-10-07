@@ -94,6 +94,23 @@ If you have any issues or you want to contribute, you are welcome! But please re
 - Enhanced drops progress bar logging [#726](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/726) ✔️
 - Monthly and yearly recap report [#797](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/797) ✔️
 - Low priority streamer list support [#742](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/742) ✔️
+- Favorite streamers priority [#682](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/682) ✔️
+- Auto buy channel points items [#794](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/794) ✔️
+- Multiple Discord notification channels [#704](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/704) ✔️
+- Telegram group topics for logs [#683](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/683) ✔️
+- Custom greetings on chat [#654](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/654) ✔️
+- Add/remove streamer on runtime [#639](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/639) ✔️
+- Async streamer data loading [#629](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/629) ✔️
+- Mine by game category [#621](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/621) ✔️
+- Disable _millify option [#631](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/631) ✔️
+- Nickname Highlighter in chat [#611](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/611) ✔️
+- Proxy support for requests [#676](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/676) ✔️
+- Configurable max watch amount [#618](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/618) ✔️
+- Custom Discord webhook username [#638](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/638) ✔️
+- Health check endpoint [#591](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/591) ✔️
+- WebUI for watching [#678](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/678) ✔️
+- PyInstaller EXE support [#609](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/609) ✔️
+- Automated testing with pytest [#754](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/754) ✔️
 
 ## Logs feature
 ### Full logs
@@ -219,6 +236,49 @@ The EXE will be in `dist/TwitchChannelPointsMiner.exe`.
 pip install pytest
 pytest
 ```
+
+### 24/7 Deployment
+
+#### Docker (Recommended)
+```bash
+docker run -d \
+  --name twitch-miner \
+  --restart unless-stopped \
+  -v $(pwd)/cookies:/usr/src/app/cookies \
+  -v $(pwd)/logs:/usr/src/app/logs \
+  -v $(pwd)/analytics:/usr/src/app/analytics \
+  rdavidoff/twitch-channel-points-miner-v2
+```
+
+#### systemd Service (Linux/WSL)
+```ini
+# /etc/systemd/system/twitch-miner.service
+[Unit]
+Description=Twitch Channel Points Miner
+After=network.target
+
+[Service]
+Type=simple
+User=your-username
+WorkingDirectory=/path/to/Twitch-Channel-Points-Miner-v2
+ExecStart=/usr/bin/python3 run.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable twitch-miner
+sudo systemctl start twitch-miner
+```
+
+### WebUI for Watching (#678)
+When analytics is enabled, visit:
+- `http://localhost:5000/watch` - See currently watched streamers
+- `http://localhost:5000/health` - Health check endpoint
+- `http://localhost:5000/streamers` - All streamers with points
 ```python
 # -*- coding: utf-8 -*-
 
