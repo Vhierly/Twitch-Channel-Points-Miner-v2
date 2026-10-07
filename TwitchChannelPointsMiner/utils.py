@@ -15,6 +15,10 @@ from TwitchChannelPointsMiner.constants import USER_AGENTS, GITHUB_url
 
 
 def _millify(input, precision=2):
+    from TwitchChannelPointsMiner.classes.Settings import Settings
+    if hasattr(Settings, 'logger') and Settings.logger is not None:
+        if getattr(Settings.logger, 'disable_millify', False):
+            return str(input)
     return millify(input, precision)
 
 

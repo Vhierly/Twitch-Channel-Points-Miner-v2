@@ -72,7 +72,12 @@ class ClientIRC(SingleServerIRCBot):
             nick = event.source.split("!", 1)[0]
             # chan = event.target
 
-            logger.info(f"{nick} at {self.channel} wrote: {msg}", extra={
+            # #611: Nickname Highlighter - highlight nickname in the message
+            highlighted_msg = msg.replace(
+                mention, f"\033[1;33m{mention}\033[0m"
+            ) if mention in msg else msg
+
+            logger.info(f"{nick} at {self.channel} wrote: {highlighted_msg}", extra={
                         "emoji": ":speech_balloon:", "event": Events.CHAT_MENTION})
     # """
 

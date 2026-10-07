@@ -58,6 +58,7 @@ class TwitchChannelPointsMiner:
         "enable_analytics",
         "disable_ssl_cert_verification",
         "disable_at_in_nickname",
+        "proxy",
         "priority",
         "streamers",
         "events_predictions",
@@ -80,6 +81,7 @@ class TwitchChannelPointsMiner:
         enable_analytics: bool = False,
         disable_ssl_cert_verification: bool = False,
         disable_at_in_nickname: bool = False,
+        proxy: str = None,
         # Settings for logging and selenium as you can see.
         priority: list = [Priority.STREAK, Priority.DROPS, Priority.ORDER],
         # This settings will be global shared trought Settings class
@@ -97,6 +99,11 @@ class TwitchChannelPointsMiner:
         Settings.disable_ssl_cert_verification = disable_ssl_cert_verification
 
         Settings.disable_at_in_nickname = disable_at_in_nickname
+
+        # #618: Configurable max watch amount (default: 2, Twitch limit)
+        Settings.max_watch_amount = 2
+
+        self.proxy = proxy
 
         import socket
 
@@ -138,7 +145,7 @@ class TwitchChannelPointsMiner:
 
         # user_agent = get_user_agent("FIREFOX")
         user_agent = get_user_agent("CHROME")
-        self.twitch = Twitch(self.username, user_agent, password)
+        self.twitch = Twitch(self.username, user_agent, password, proxy=self.proxy)
 
         self.claim_drops_startup = claim_drops_startup
         self.priority = priority if isinstance(priority, list) else [priority]

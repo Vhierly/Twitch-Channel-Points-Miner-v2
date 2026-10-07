@@ -84,7 +84,8 @@ class LoggerSettings:
         "gotify",
         "apprise",
         "username",
-        "time_format"
+        "time_format",
+        "disable_millify"
     ]
 
     def __init__(
@@ -107,7 +108,8 @@ class LoggerSettings:
         gotify: Gotify or None = None,
         apprise: Apprise or None = None,
         username: str or None = None,
-        time_format: str or None = None
+        time_format: str or None = None,
+        disable_millify: bool = False
     ):
         self.save = save
         self.less = less
@@ -128,6 +130,7 @@ class LoggerSettings:
         self.apprise = apprise
         self.username = username
         self.time_format = time_format
+        self.disable_millify = disable_millify
 
 
 class FileFormatter(logging.Formatter):

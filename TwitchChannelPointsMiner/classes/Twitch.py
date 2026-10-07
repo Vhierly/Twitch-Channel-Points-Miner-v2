@@ -66,9 +66,10 @@ class Twitch(object):
         "client_version",
         "twilight_build_id_pattern",
         "_connection_error_logged",
+        "proxy",
     ]
 
-    def __init__(self, username, user_agent, password=None):
+    def __init__(self, username, user_agent, password=None, proxy=None):
         cookies_path = os.path.join(Path().absolute(), "cookies")
         Path(cookies_path).mkdir(parents=True, exist_ok=True)
         self.cookies_file = os.path.join(cookies_path, f"{username}.pkl")
@@ -81,6 +82,7 @@ class Twitch(object):
         )
         self.running = True
         self._connection_error_logged = False
+        self.proxy = proxy
         # self.integrity = None
         # self.integrity_expire = 0
         self.client_session = token_hex(16)
@@ -293,6 +295,7 @@ class Twitch(object):
 
     def post_gql_request(self, json_data):
         max_retries = 3
+        proxies = {"http": self.proxy, "https": self.proxy} if self.proxy else None
         for attempt in range(max_retries):
             try:
                 response = requests.post(
@@ -309,6 +312,7 @@ class Twitch(object):
                     },
                     timeout=15,
                     verify=not Settings.disable_ssl_cert_verification,
+                    proxies=proxies,
                 )
                 logger.debug(
                     f"Data: {json_data}, Status code: {response.status_code}, Content: {response.text}"
@@ -442,7 +446,7 @@ class Twitch(object):
                 Twitch has a limit - you can't watch more than 2 channels at one time.
                 We'll take the first two streamers from the final list as they have the highest priority.
                 """
-                max_watch_amount = 2
+                max_watch_amount = getattr(Settings, 'max_watch_amount', 2)
                 streamers_watching = set()
 
                 def remaining_watch_amount():
@@ -530,6 +534,15 @@ class Twitch(object):
                             if streamers[index].settings.low_priority is True
                         ]
                         streamers_watching.update(low_priority_streamers[:remaining_watch_amount()])
+
+                    elif prior == Priority.FAVORITE:
+                        # #682: Favorite streamers get priority boost
+                        favorite_streamers = [
+                            index
+                            for index in streamers_index
+                            if streamers[index].settings.favorite is True
+                        ]
+                        streamers_watching.update(favorite_streamers[:remaining_watch_amount()])
 
                 streamers_watching = list(streamers_watching)[:max_watch_amount]
 
