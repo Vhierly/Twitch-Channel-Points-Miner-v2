@@ -481,6 +481,7 @@ class TwitchChannelPointsMiner:
                         and streamer.settings.auto_redeem_rewards is True
                         and streamer.channel_points > 0
                     ):
+                        logger.debug(f"Attempting to redeem rewards for {streamer.username} (balance: {streamer.channel_points})")
                         unlocked = self.twitch.redeem_all_rewards(streamer)
                         if unlocked > 0:
                             streamer.unlocked_rewards += unlocked

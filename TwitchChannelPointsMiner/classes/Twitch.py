@@ -1059,6 +1059,7 @@ class Twitch(object):
 
             settings = channel.get("communityPointsSettings", {})
             if not settings:
+                logger.debug(f"No communityPointsSettings for {streamer.username}")
                 return 0
 
             # Collect ALL reward types: custom rewards + automatic rewards
