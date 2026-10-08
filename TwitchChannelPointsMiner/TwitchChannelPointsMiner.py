@@ -235,6 +235,7 @@ class TwitchChannelPointsMiner:
         if self.running:
             logger.error("You can't start multiple sessions of this instance!")
         else:
+            print(f"[DEBUG] run() called, starting session {self.session_id}", flush=True)
             logger.info(
                 f"Start session: '{self.session_id}'", extra={"emoji": ":bomb:"}
             )
@@ -477,21 +478,16 @@ class TwitchChannelPointsMiner:
 
                 # Auto-redeem channel point rewards (emotes)
                 try:
-                    print(f"[DEBUG] Checking auto-redeem: {len(self.streamers)} streamers, running={self.running}", flush=True)
-                    logger.info(f"Checking auto-redeem: {len(self.streamers)} streamers")
                     for streamer in self.streamers:
-                        logger.info(f"  {streamer.username}: online={streamer.is_online}, auto_redeem={getattr(streamer.settings, 'auto_redeem_rewards', 'N/A')}, points={streamer.channel_points}")
                         if (
                             streamer.is_online
                             and streamer.settings.auto_redeem_rewards is True
                             and streamer.channel_points > 0
                         ):
-                            logger.info(f"Attempting to redeem rewards for {streamer.username} (balance: {streamer.channel_points})")
                             unlocked = self.twitch.redeem_all_rewards(streamer)
                             if unlocked > 0:
                                 streamer.unlocked_rewards += unlocked
                 except Exception as e:
-                    print(f"[DEBUG] Auto-redeem error: {e}", flush=True)
                     logger.error(f"Auto-redeem error: {e}")
 
                 # #794: Auto buy channel points items

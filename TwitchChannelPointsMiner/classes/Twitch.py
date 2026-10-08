@@ -12,6 +12,7 @@ import re
 import string
 import sys
 import time
+import uuid
 import requests
 import validators
 # import json
@@ -1043,8 +1044,18 @@ class Twitch(object):
         self.post_gql_request(json_data)
 
     def redeem_all_rewards(self, streamer):
-        """Unlock all available channel point rewards (emotes, etc) for a streamer."""
+        """Unlock all available channel point rewards (emotes, etc) for a streamer.
+
+        Sends the full mutation body (no persisted hash) and inspects the per-reward
+        ``error.code`` so failures are reported honestly instead of silently counted
+        as successes. Rewards we can't redeem (too expensive, disabled, out of stock,
+        paused, or not allowed by Twitch) are skipped without hammering the API.
+        """
         try:
+            # Need the channel ID to redeem; resolve it if we don't have it yet.
+            if not streamer.channel_id:
+                return 0
+
             # Get channel points context to find available rewards
             json_data = copy.deepcopy(GQLOperations.ChannelPointsContext)
             json_data["variables"] = {"channelLogin": streamer.username}
@@ -1062,26 +1073,16 @@ class Twitch(object):
                 logger.debug(f"No communityPointsSettings for {streamer.username}")
                 return 0
 
-            # Collect ALL reward types: custom rewards + automatic rewards
+            # Collect ALL reward types: custom rewards + automatic rewards.
+            # NOTE: automatic rewards (e.g. SEND_ANIMATED_MESSAGE) are NOT redeemable
+            # via this mutation and have no meaningful cost -> skip them.
             all_rewards = []
-
-            # Custom rewards (user-created emotes, etc)
             for reward in settings.get("customRewards", []):
                 all_rewards.append({
                     "id": reward.get("id"),
                     "title": reward.get("title", "Unknown"),
                     "cost": reward.get("cost", 0),
-                    "is_enabled": reward.get("isEnabled", True),
-                    "in_stock": reward.get("isInStock", True),
-                    "is_paused": reward.get("isPaused", False),
-                })
-
-            # Automatic rewards (built-in like message highlight, etc)
-            for reward in settings.get("automaticRewards", []):
-                all_rewards.append({
-                    "id": reward.get("id"),
-                    "title": reward.get("title", "Unknown"),
-                    "cost": reward.get("cost", 0),
+                    "prompt": reward.get("prompt"),
                     "is_enabled": reward.get("isEnabled", True),
                     "in_stock": reward.get("isInStock", True),
                     "is_paused": reward.get("isPaused", False),
@@ -1096,8 +1097,8 @@ class Twitch(object):
                 cost = reward["cost"]
                 title = reward["title"]
 
-                # Skip if cost is None or invalid
-                if cost is None or not isinstance(cost, (int, float)):
+                # Skip invalid entries
+                if not reward_id or cost is None or not isinstance(cost, (int, float)):
                     continue
 
                 # Skip if not enough points, disabled, out of stock, or paused
@@ -1105,36 +1106,61 @@ class Twitch(object):
                     continue
                 if not reward["is_enabled"] or not reward["in_stock"] or reward["is_paused"]:
                     continue
+                # Skip rewards already redeemed in this online session
+                if streamer.redeemed_rewards.get(reward_id):
+                    continue
 
-                # Redeem the reward using the correct GraphQL operation
-                redeem_data = {
-                    "operationName": "RedeemCommunityPointsCustomReward",
-                    "variables": {
-                        "input": {
-                            "channelID": streamer.channel_id,
-                            "rewardID": reward_id
-                        }
-                    },
-                    "extensions": {
-                        "persistedQuery": {
-                            "version": 1,
-                            "sha256Hash": "58b0e2a4-0a4f-4f1e-9c1a-9f8e7d6c5b4a"
-                        }
+                # Redeem with the full mutation body + ALL required input fields.
+                # Twitch's RedeemCommunityPointsCustomRewardInput validates that
+                # channelID, rewardID, cost, title and prompt match the reward's true
+                # values, otherwise it returns PROPERTIES_MISMATCH. transactionID must
+                # be a fresh unique id per attempt.
+                redeem_data = copy.deepcopy(GQLOperations.RedeemCommunityPointsCustomReward)
+                redeem_data["variables"] = {
+                    "input": {
+                        "channelID": str(streamer.channel_id),
+                        "rewardID": reward_id,
+                        "cost": int(cost),
+                        "title": title,
+                        "prompt": reward.get("prompt"),
+                        "transactionID": str(uuid.uuid4()),
                     }
                 }
                 redeem_response = self.post_gql_request(redeem_data)
 
-                if redeem_response and "data" in redeem_response:
+                # Inspect the actual result: Twitch returns error.code on failure
+                payload = (
+                    (redeem_response or {})
+                    .get("data", {})
+                    .get("redeemCommunityPointsCustomReward", {})
+                )
+                error = payload.get("error") if isinstance(payload, dict) else None
+                redemption = payload.get("redemption") if isinstance(payload, dict) else None
+
+                if redemption and not error:
                     unlocked_count += 1
+                    streamer.redeemed_rewards[reward_id] = True
+                    # Twitch deducts the points server-side; keep local balance in sync
+                    streamer.channel_points = max(0, streamer.channel_points - int(cost))
                     logger.info(
                         f"🔓 Unlocked reward: {title} ({cost} points) for {streamer.username}",
-                        extra={"emoji": ":unlock:", "event": Events.BONUS_CLAIM}
+                        extra={"emoji": ":unlock:", "event": Events.BONUS_CLAIM},
+                    )
+                else:
+                    code = (error or {}).get("code", "UNKNOWN")
+                    # Mark as attempted so we don't retry a hopeless reward every loop.
+                    # DUPLICATE_TRANSACTION/TRANSACTION_IN_PROGRESS are transient and
+                    # worth retrying, so don't mark those.
+                    if code not in ("DUPLICATE_TRANSACTION", "TRANSACTION_IN_PROGRESS"):
+                        streamer.redeemed_rewards[reward_id] = True
+                    logger.info(
+                        f"⚠️ Could not redeem '{title}' ({cost} points) for {streamer.username}: {code}"
                     )
 
             if unlocked_count > 0:
                 logger.info(
                     f"🎉 Unlocked {unlocked_count} rewards for {streamer.username}!",
-                    extra={"emoji": ":tada:", "event": Events.BONUS_CLAIM}
+                    extra={"emoji": ":tada:", "event": Events.BONUS_CLAIM},
                 )
 
             return unlocked_count

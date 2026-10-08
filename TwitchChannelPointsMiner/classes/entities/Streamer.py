@@ -124,6 +124,7 @@ class Streamer(object):
         "streamer_url",
         "mutex",
         "unlocked_rewards",
+        "redeemed_rewards",
     ]
 
     def __init__(self, username, settings=None):
@@ -150,6 +151,10 @@ class Streamer(object):
 
         self.mutex = Lock()
         self.unlocked_rewards = 0
+        # reward_id -> True for rewards already redeemed during the current online
+        # session. Reset on each new stream so a cheap reward isn't redeemed every
+        # loop iteration (which would spam the streamer and drain points).
+        self.redeemed_rewards = {}
 
     def __repr__(self):
         return f"Streamer(username={self.username}, channel_id={self.channel_id}, channel_points={_millify(self.channel_points)})"
@@ -180,6 +185,8 @@ class Streamer(object):
         if self.is_online is False:
             self.online_at = time.time()
             self.is_online = True
+            # New stream session -> allow redeeming each reward once again
+            self.redeemed_rewards = {}
             # #825: Preserve watch streak progress if streamer was recently offline
             # Only reset streak if it's been more than 30 minutes since last offline
             # or if we haven't started watching yet

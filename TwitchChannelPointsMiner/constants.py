@@ -230,12 +230,17 @@ class GQLOperations:
     }
     RedeemCommunityPointsCustomReward = {
         "operationName": "RedeemCommunityPointsCustomReward",
-        "extensions": {
-            "persistedQuery": {
-                "version": 1,
-                "sha256Hash": "58b0e2a4-0a4f-4f1e-9c1a-9f8e7d6c5b4a"
-            }
-        }
+        # Twitch removed/never-registered a persisted hash for this mutation, so we
+        # must send the full query body instead of relying on APQ (a fake hash would
+        # return HTTP 400 "persistedQuery does not have a valid sha256 hash").
+        "query": (
+            "mutation RedeemCommunityPointsCustomReward($input: RedeemCommunityPointsCustomRewardInput!) {"
+            " redeemCommunityPointsCustomReward(input: $input) {"
+            " error { code }"
+            " redemption { id status }"
+            " }"
+            "}"
+        ),
     }
     ChannelPointsStore = {
         "operationName": "ChannelPointsStore",
