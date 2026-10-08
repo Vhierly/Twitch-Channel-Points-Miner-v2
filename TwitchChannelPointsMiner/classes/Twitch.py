@@ -1043,7 +1043,7 @@ class Twitch(object):
         self.post_gql_request(json_data)
 
     def redeem_all_rewards(self, streamer):
-        """Unlock all available channel point rewards (emotes) for a streamer."""
+        """Unlock all available channel point rewards (emotes, etc) for a streamer."""
         try:
             # Get channel points context to find available rewards
             json_data = copy.deepcopy(GQLOperations.ChannelPointsContext)
@@ -1061,22 +1061,47 @@ class Twitch(object):
             if not settings:
                 return 0
 
-            # Get custom rewards (emotes)
-            custom_rewards = settings.get("customRewards", [])
-            if not custom_rewards:
+            # Collect ALL reward types: custom rewards + automatic rewards
+            all_rewards = []
+
+            # Custom rewards (user-created emotes, etc)
+            for reward in settings.get("customRewards", []):
+                all_rewards.append({
+                    "id": reward.get("id"),
+                    "title": reward.get("title", "Unknown"),
+                    "cost": reward.get("cost", 0),
+                    "is_enabled": reward.get("isEnabled", True),
+                    "in_stock": reward.get("isInStock", True),
+                    "is_paused": reward.get("isPaused", False),
+                })
+
+            # Automatic rewards (built-in like message highlight, etc)
+            for reward in settings.get("automaticRewards", []):
+                all_rewards.append({
+                    "id": reward.get("id"),
+                    "title": reward.get("title", "Unknown"),
+                    "cost": reward.get("cost", 0),
+                    "is_enabled": reward.get("isEnabled", True),
+                    "in_stock": reward.get("isInStock", True),
+                    "is_paused": reward.get("isPaused", False),
+                })
+
+            if not all_rewards:
                 return 0
 
             unlocked_count = 0
-            for reward in custom_rewards:
-                reward_id = reward.get("id")
-                cost = reward.get("cost", 0)
-                title = reward.get("title", "Unknown")
+            for reward in all_rewards:
+                reward_id = reward["id"]
+                cost = reward["cost"]
+                title = reward["title"]
 
-                # Skip if not enough points or already redeemed
+                # Skip if not enough points, disabled, out of stock, or paused
                 if cost > streamer.channel_points:
                     continue
+                if not reward["is_enabled"] or not reward["in_stock"] or reward["is_paused"]:
+                    continue
 
-                # Redeem the reward
+                # Redeem the reward using the correct GraphQL operation
                 redeem_data = {
                     "operationName": "RedeemCommunityPointsCustomReward",
                     "variables": {
