@@ -26,6 +26,7 @@ from TwitchChannelPointsMiner.logger import LoggerSettings
 from TwitchChannelPointsMiner.classes.Chat import ChatPresence
 from TwitchChannelPointsMiner.classes.Settings import Priority
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
+from TwitchChannelPointsMiner.classes.entities.Bet import BetSettings, Strategy, DelayMode
 
 # ==================== KONFIGURASI ====================
 
@@ -69,11 +70,19 @@ twitch_miner = TwitchChannelPointsMiner(
 
     # Pengaturan streamer
     streamer_settings=StreamerSettings(
-        make_predictions=False,  # True = ikut betting/prediction (butuh strategi)
+        make_predictions=True,  # Ikut betting/prediction
         follow_raid=True,       # Ikut raid untuk bonus points
         claim_drops=True,       # Auto-claim drops
         watch_streak=True,      # Prioritaskan watch streak
         chat=ChatPresence.ONLINE,  # Join IRC chat saat streamer online
+        bet=BetSettings(
+            strategy=Strategy.MOST_VOTED,  # Pilih outcome dengan user terbanyak (paling mungkin menang)
+            percentage=3,                  # 3% dari balance (aman)
+            max_points=10000,              # Max 10k points per bet
+            minimum_points=1000,           # Min 1000 points (skip bet kecil)
+            delay=2,                       # Place bet 2 detik sebelum tutup (odds sudah stabil)
+            delay_mode=DelayMode.FROM_END,
+        ),
     ),
 )
 
