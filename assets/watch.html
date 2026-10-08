@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Miner - Watching</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.6.1/css/bulma.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link href="{{url_for('static', filename='dark-theme.css')}}" rel="stylesheet">
+    <style>
+        body { padding: 20px; }
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 20px 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #9146ff;
+        }
+        .online-title { color: #00ff88; }
+        .offline-title { color: #ff6b6b; }
+        .streamer-card {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+        .streamer-card:hover { transform: translateX(5px); }
+        .online-card { border-left: 4px solid #00ff88; }
+        .offline-card { border-left: 4px solid #ff6b6b; opacity: 0.7; }
+        .streamer-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            background: #9146ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: white;
+        }
+        .streamer-info { flex: 1; }
+        .streamer-name { font-weight: bold; font-size: 1.1rem; }
+        .streamer-title { color: #aaa; font-size: 0.9rem; margin-top: 3px; }
+        .streamer-game { color: #9146ff; font-size: 0.85rem; margin-top: 3px; }
+        .streamer-points { text-align: right; }
+        .points-value { font-size: 1.3rem; font-weight: bold; color: #ffe045; }
+        .points-label { font-size: 0.75rem; color: #888; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .badge-online { background: #00ff88; color: #000; }
+        .badge-offline { background: #ff6b6b; color: #fff; }
+        .last-update { color: #666; font-size: 0.8rem; text-align: right; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title has-text-white">📺 Currently Watching</h1>
+        <p class="has-text-grey">Auto-refresh every 30 seconds</p>
+
+        <div class="section-title online-title">🟢 Online (<span id="online-count">0</span>)</div>
+        <div id="online-streamers"></div>
+
+        <div class="section-title offline-title">🔴 Offline (<span id="offline-count">0</span>)</div>
+        <div id="offline-streamers"></div>
+
+        <div class="last-update">Last update: <span id="last-update"></span></div>
+    </div>
+
+    <script>
+        function loadData() {
+            $.getJSON('/api/watching', function(data) {
+                const online = data.filter(s => s.is_online);
+                const offline = data.filter(s => !s.is_online);
+
+                $('#online-count').text(online.length);
+                $('#offline-count').text(offline.length);
+
+                // Online streamers
+                $('#online-streamers').html(online.map(s => `
+                    <div class="streamer-card online-card">
+                        <div class="streamer-avatar">${s.username.charAt(0).toUpperCase()}</div>
+                        <div class="streamer-info">
+                            <div class="streamer-name">
+                                <a href="https://twitch.tv/${s.username}" target="_blank" style="color: #fff;">${s.username}</a>
+                                <span class="status-badge badge-online">LIVE</span>
+                            </div>
+                            ${s.title ? `<div class="streamer-title">${s.title}</div>` : ''}
+                            ${s.game ? `<div class="streamer-game">🎮 ${s.game}</div>` : ''}
+                        </div>
+                        <div class="streamer-points">
+                            <div class="points-value">${s.channel_points.toLocaleString()}</div>
+                            <div class="points-label">points</div>
+                        </div>
+                    </div>
+                `).join(''));
+
+                // Offline streamers
+                $('#offline-streamers').html(offline.map(s => `
+                    <div class="streamer-card offline-card">
+                        <div class="streamer-avatar">${s.username.charAt(0).toUpperCase()}</div>
+                        <div class="streamer-info">
+                            <div class="streamer-name">
+                                <a href="https://twitch.tv/${s.username}" target="_blank" style="color: #aaa;">${s.username}</a>
+                                <span class="status-badge badge-offline">OFFLINE</span>
+                            </div>
+                        </div>
+                        <div class="streamer-points">
+                            <div class="points-value">${s.channel_points.toLocaleString()}</div>
+                            <div class="points-label">points</div>
+                        </div>
+                    </div>
+                `).join(''));
+
+                $('#last-update').text(new Date().toLocaleTimeString());
+            });
+        }
+
+        loadData();
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>

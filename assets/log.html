@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Miner - Logs</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.6.1/css/bulma.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link href="{{url_for('static', filename='dark-theme.css')}}" rel="stylesheet">
+    <style>
+        body { padding: 20px; }
+        .log-container {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            max-height: 70vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-line { padding: 2px 0; }
+        .log-online { color: #00ff88; }
+        .log-offline { color: #ff6b6b; }
+        .log-gain { color: #ffe045; }
+        .log-info { color: #45c1ff; }
+        .log-warning { color: #ff9f43; }
+        .log-error { color: #ff4545; }
+        .controls { margin-bottom: 15px; }
+        .controls label { margin-right: 15px; color: #aaa; }
+        .last-update { color: #666; font-size: 0.8rem; text-align: right; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title has-text-white">📋 Logs</h1>
+        <p class="has-text-grey">Auto-refresh every 10 seconds</p>
+
+        <div class="controls">
+            <label>
+                <input type="checkbox" id="auto-scroll" checked> Auto-scroll
+            </label>
+            <label>
+                <input type="checkbox" id="filter-online" checked> Online
+            </label>
+            <label>
+                <input type="checkbox" id="filter-offline" checked> Offline
+            </label>
+            <label>
+                <input type="checkbox" id="filter-gain" checked> Points
+            </label>
+            <button class="button is-small" onclick="loadLog()">🔄 Refresh</button>
+        </div>
+
+        <div class="log-container" id="log-content">Loading...</div>
+        <div class="last-update">Last update: <span id="last-update"></span></div>
+    </div>
+
+    <script>
+        function classifyLine(line) {
+            if (line.includes('is Online') || line.includes('Join IRC')) return 'log-online';
+            if (line.includes('is Offline')) return 'log-offline';
+            if (line.includes('→') || line.includes('gained')) return 'log-gain';
+            if (line.includes('WARNING')) return 'log-warning';
+            if (line.includes('ERROR')) return 'log-error';
+            return 'log-info';
+        }
+
+        function loadLog() {
+            $.get('/log', function(data) {
+                const lines = data.split('\n').filter(l => l.trim());
+                const showOnline = $('#filter-online').prop('checked');
+                const showOffline = $('#filter-offline').prop('checked');
+                const showGain = $('#filter-gain').prop('checked');
+
+                const filtered = lines.filter(line => {
+                    if (!showOnline && (line.includes('is Online') || line.includes('Join IRC'))) return false;
+                    if (!showOffline && line.includes('is Offline')) return false;
+                    if (!showGain && (line.includes('→') || line.includes('gained'))) return false;
+                    return true;
+                });
+
+                const html = filtered.map(line => {
+                    const cls = classifyLine(line);
+                    return `<div class="log-line ${cls}">${line}</div>`;
+                }).join('');
+
+                $('#log-content').html(html || '<div class="log-line">No log entries yet...</div>');
+
+                if ($('#auto-scroll').prop('checked')) {
+                    $('#log-content').scrollTop($('#log-content')[0].scrollHeight);
+                }
+
+                $('#last-update').text(new Date().toLocaleTimeString());
+            });
+        }
+
+        loadLog();
+        setInterval(loadLog, 10000);
+    </script>
+</body>
+</html>

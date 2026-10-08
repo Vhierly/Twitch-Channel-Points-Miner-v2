@@ -210,6 +210,8 @@ def check_assets():
         "script.js",
         "style.css",
         "dark-theme.css",
+        "watch.html",
+        "log.html",
     ]
     assets_folder = os.path.join(Path().absolute(), "assets")
     if os.path.isdir(assets_folder) is False:
@@ -295,6 +297,10 @@ class AnalyticsServer(Thread):
         self.app.add_url_rule(
             "/api/watching", "api_watching", self._api_watching, methods=["GET"]
         )
+        # Log viewer page
+        self.app.add_url_rule(
+            "/logs", "logs", self._logs_page, methods=["GET"]
+        )
         self.app.add_url_rule("/json_all", "json_all",
                               json_all, methods=["GET"])
         self.app.add_url_rule(
@@ -302,29 +308,7 @@ class AnalyticsServer(Thread):
 
     def _watch_page(self):
         """#678: WebUI page showing currently watched streamers."""
-        html = """<!DOCTYPE html>
-<html><head><title>Twitch Miner - Watching</title>
-<meta http-equiv="refresh" content="30">
-<style>
-body { font-family: sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
-h1 { color: #9147ff; }
-.streamer { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; }
-.online { border-left: 4px solid #00ff88; }
-.offline { border-left: 4px solid #ff4444; opacity: 0.6; }
-</style></head><body>
-<h1>Currently Watching</h1>
-<div id="streamers"></div>
-<script>
-fetch('/api/watching').then(r => r.json()).then(data => {
-    document.getElementById('streamers').innerHTML = data.map(s =>
-        `<div class="streamer ${s.is_online ? 'online' : 'offline'}">
-            <strong>${s.username}</strong> - ${s.is_online ? 'Online' : 'Offline'}<br>
-            Points: ${s.channel_points} | Title: ${s.title || 'N/A'}
-        </div>`
-    ).join('');
-});
-</script></body></html>"""
-        return Response(html, status=200, mimetype="text/html")
+        return render_template("watch.html")
 
     def _api_watching(self):
         """#678: API endpoint returning currently watched streamers."""
@@ -346,6 +330,10 @@ fetch('/api/watching').then(r => r.json()).then(data => {
             status=200,
             mimetype="application/json",
         )
+
+    def _logs_page(self):
+        """Log viewer page with filtering and auto-refresh."""
+        return render_template("log.html")
 
     def run(self):
         logger.info(
