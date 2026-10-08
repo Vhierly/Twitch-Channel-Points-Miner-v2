@@ -449,6 +449,7 @@ class TwitchChannelPointsMiner:
 
             refresh_context = time.time()
             while self.running:
+                print(f"[DEBUG] Loop iteration: running={self.running}, streamers={len(self.streamers)}", flush=True)
                 time.sleep(random.uniform(20, 60))
 
                 # #639: Add/remove streamer on runtime
