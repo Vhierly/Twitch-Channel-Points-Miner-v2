@@ -97,7 +97,7 @@ class StreamerSettings(object):
         if self.auto_buy is None:
             self.auto_buy = False
         if self.auto_redeem_rewards is None:
-            self.auto_redeem_rewards = False
+            self.auto_redeem_rewards = True
 
     def __repr__(self):
         return f"StreamerSettings(make_predictions={self.make_predictions}, follow_raid={self.follow_raid}, claim_drops={self.claim_drops}, claim_moments={self.claim_moments}, watch_streak={self.watch_streak}, community_goals={self.community_goals}, bet={self.bet}, chat={self.chat}, random_messages={self.random_messages}, random_message_interval={self.random_message_interval}, low_priority={self.low_priority}, favorite={self.favorite}, greeting_message={self.greeting_message}, auto_buy={self.auto_buy}, auto_redeem_rewards={self.auto_redeem_rewards})"
