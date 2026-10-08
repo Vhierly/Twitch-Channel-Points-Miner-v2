@@ -109,6 +109,8 @@ If you have any issues or you want to contribute, you are welcome! But please re
 - Custom Discord webhook username [#638](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/638) ✔️
 - Health check endpoint [#591](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/591) ✔️
 - WebUI for watching [#678](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/678) ✔️
+- Auto-redeem custom Channel Points rewards, with anti-spam cap/delay, sound-reward skip, and per-stream persistence ✔️
+- Last claimed rewards shown per streamer on the `/watch` dashboard ✔️
 - PyInstaller EXE support [#609](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/609) ✔️
 - Automated testing with pytest [#754](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2/issues/754) ✔️
 
@@ -276,7 +278,7 @@ sudo systemctl start twitch-miner
 
 ### WebUI for Watching (#678)
 When analytics is enabled, visit:
-- `http://localhost:5000/watch` - See currently watched streamers
+- `http://localhost:5000/watch` - See currently watched streamers, and the last rewards auto-claimed for each
 - `http://localhost:5000/health` - Health check endpoint
 - `http://localhost:5000/streamers` - All streamers with points
 ```python
@@ -670,6 +672,11 @@ Webhook(
 | `community_goals`    | bool          | False                             | If True, contributes the max channel points per stream to the streamers' community challenge goals |
 | `bet`              	| BetSettings 	|  	                                | Rules to follow for the bet                                                                                                                                                                                                       |
 | `chat` 	            | ChatPresence  | ONLINE    	                    | Join IRC-Chat to appear online in chat and attempt to get StreamElements channel points and increase view-time  [#47](https://github.com/Tkd-Alex/Twitch-Channel-Points-Miner-v2/issues/47)                                       |
+| `auto_redeem_rewards` | bool        | True                           | Automatically redeem (unlock) a streamer's custom Channel Points rewards using your balance                                          |
+| `auto_redeem_max_per_stream` | int  | 3                              | Max rewards to redeem per stream (`0` = unlimited). Prevents burst-claiming that can get you banned |
+| `auto_redeem_delay`  | float        | 5.0                            | Seconds to wait between consecutive redemptions (anti-spam pacing) |
+| `auto_redeem_skip_sounds` | bool    | True                           | Skip rewards that play audio (TTS, song requests, sound alerts) so the miner never triggers noises on stream |
+| `auto_redeem_blocklist` | list     | []                             | Extra keywords (case-insensitive) to never redeem, matched against the reward title + prompt |
 
 Allowed values for `chat` are:
 - `ALWAYS` Join in IRC chat and never leave
@@ -799,6 +806,36 @@ Enhanced progress bar logging for drops, shown every 25% progress.
 
 ### Monthly/Yearly Recap (#797)
 Automatically prints monthly and yearly points recap at the end of session.
+
+### Auto-Redeem Channel Points Rewards
+Automatically unlock a streamer's custom Channel Points rewards (emotes, etc.) using your balance.
+```python
+streamer_settings=StreamerSettings(
+    auto_redeem_rewards=True,        # enable auto-redeem
+    auto_redeem_max_per_stream=3,    # max 3 rewards per stream (0 = unlimited)
+    auto_redeem_delay=8.0,           # wait 8s between redemptions (anti-spam)
+    auto_redeem_skip_sounds=True,    # never claim TTS / song / sound-alert rewards
+    auto_redeem_blocklist=[],        # extra keywords to skip, e.g. ["jumpscare"]
+)
+```
+
+**Anti-spam / ban safety.** Redemptions are paced (`auto_redeem_delay`) and capped
+(`auto_redeem_max_per_stream`). Redeemed reward IDs and the per-stream count are
+persisted to `data/redeemed_rewards.json`, keyed by streamer + `broadcast_id`, so:
+- a restart while a stream is still live will **not** re-redeem the same rewards;
+- a new stream (`broadcast_id` changes) starts a fresh set.
+
+Burst-claiming many rewards in seconds can get your account banned/timed-out on a
+channel, so keep a sane cap and delay.
+
+**Sound rewards are skipped by default.** Rewards whose title or prompt looks like
+audio (e.g. `TTS`, `Song Request`, `Air Horn`, or Blerp soundboard rewards with
+`"Hear the sound on Blerp"` in the prompt) are never redeemed, so the miner can't
+trigger noises on the streamer's channel. Add your own keywords with
+`auto_redeem_blocklist`.
+
+> Only **custom** rewards are redeemable this way. Twitch "automatic" rewards and
+> zero-cost rewards cannot be redeemed through the API and are skipped.
 
 ## Analytics
 We have recently introduced a little frontend where you can show with a chart you points trend. The script will spawn a Flask web-server on your machine where you can select binding address and port.
