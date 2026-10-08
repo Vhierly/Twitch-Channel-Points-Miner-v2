@@ -1096,6 +1096,10 @@ class Twitch(object):
                 cost = reward["cost"]
                 title = reward["title"]
 
+                # Skip if cost is None or invalid
+                if cost is None or not isinstance(cost, (int, float)):
+                    continue
+
                 # Skip if not enough points, disabled, out of stock, or paused
                 if cost > streamer.channel_points:
                     continue
