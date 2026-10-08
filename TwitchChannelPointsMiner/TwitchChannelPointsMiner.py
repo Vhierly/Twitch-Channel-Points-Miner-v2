@@ -475,6 +475,7 @@ class TwitchChannelPointsMiner:
                             streamer.irc_chat.send_greeting(streamer.settings.greeting_message)
 
                 # Auto-redeem channel point rewards (emotes)
+                print(f"[DEBUG] Checking auto-redeem: {len(self.streamers)} streamers, running={self.running}", flush=True)
                 logger.info(f"Checking auto-redeem: {len(self.streamers)} streamers")
                 for streamer in self.streamers:
                     logger.info(f"  {streamer.username}: online={streamer.is_online}, auto_redeem={getattr(streamer.settings, 'auto_redeem_rewards', 'N/A')}, points={streamer.channel_points}")
