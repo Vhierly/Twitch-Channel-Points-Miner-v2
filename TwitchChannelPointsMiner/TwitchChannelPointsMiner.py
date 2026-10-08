@@ -475,23 +475,23 @@ class TwitchChannelPointsMiner:
                             streamer.irc_chat.send_greeting(streamer.settings.greeting_message)
 
                 # Auto-redeem channel point rewards (emotes)
-                print(f"[DEBUG] Checking auto-redeem: {len(self.streamers)} streamers, running={self.running}", flush=True)
-                logger.info(f"Checking auto-redeem: {len(self.streamers)} streamers")
-                for streamer in self.streamers:
-                    logger.info(f"  {streamer.username}: online={streamer.is_online}, auto_redeem={getattr(streamer.settings, 'auto_redeem_rewards', 'N/A')}, points={streamer.channel_points}")
-                    if (
-                        streamer.is_online
-                        and streamer.settings.auto_redeem_rewards is True
-                        and streamer.channel_points > 0
-                    ):
-                        logger.info(f"Attempting to redeem rewards for {streamer.username} (balance: {streamer.channel_points})")
-                        unlocked = self.twitch.redeem_all_rewards(streamer)
-                        if unlocked > 0:
-                            streamer.unlocked_rewards += unlocked
-                            streamer._greeting_sent = True
-                    else:
-                        if hasattr(streamer, '_greeting_sent'):
-                            streamer._greeting_sent = False
+                try:
+                    print(f"[DEBUG] Checking auto-redeem: {len(self.streamers)} streamers, running={self.running}", flush=True)
+                    logger.info(f"Checking auto-redeem: {len(self.streamers)} streamers")
+                    for streamer in self.streamers:
+                        logger.info(f"  {streamer.username}: online={streamer.is_online}, auto_redeem={getattr(streamer.settings, 'auto_redeem_rewards', 'N/A')}, points={streamer.channel_points}")
+                        if (
+                            streamer.is_online
+                            and streamer.settings.auto_redeem_rewards is True
+                            and streamer.channel_points > 0
+                        ):
+                            logger.info(f"Attempting to redeem rewards for {streamer.username} (balance: {streamer.channel_points})")
+                            unlocked = self.twitch.redeem_all_rewards(streamer)
+                            if unlocked > 0:
+                                streamer.unlocked_rewards += unlocked
+                except Exception as e:
+                    print(f"[DEBUG] Auto-redeem error: {e}", flush=True)
+                    logger.error(f"Auto-redeem error: {e}")
 
                 # #794: Auto buy channel points items
                 for streamer in self.streamers:
