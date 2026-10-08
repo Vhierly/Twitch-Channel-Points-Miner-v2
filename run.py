@@ -75,7 +75,14 @@ twitch_miner = TwitchChannelPointsMiner(
         claim_drops=True,       # Auto-claim drops
         watch_streak=True,      # Prioritaskan watch streak
         chat=ChatPresence.ONLINE,  # Join IRC chat saat streamer online
-        auto_redeem_rewards=True,  # Auto-unlock semua emote/reward pakai points
+        auto_redeem_rewards=True,  # Auto-unlock emote/reward pakai points
+        # ===== ANTI-SPAM (biar gak kena ban kayak anniesatv) =====
+        auto_redeem_max_per_stream=3,   # Max 3 reward per stream (0 = unlimited)
+        auto_redeem_delay=8.0,          # Jeda 8 detik antar redeem (jangan burst)
+        # ===== SKIP REWARD SUARA =====
+        auto_redeem_skip_sounds=True,   # Jangan claim TTS/song/sound alert/dll
+        # Tambahan keyword yang mau di-skip (opsional, huruf kecil)
+        auto_redeem_blocklist=[],       # contoh: ["jumpscare", "moan"]
         bet=BetSettings(
             strategy=Strategy.MOST_VOTED,  # Pilih outcome dengan user terbanyak (paling mungkin menang)
             percentage=3,                  # 3% dari balance (aman)

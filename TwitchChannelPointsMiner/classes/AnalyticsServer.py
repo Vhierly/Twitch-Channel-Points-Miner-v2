@@ -325,6 +325,7 @@ class AnalyticsServer(Thread):
                     "title": s.stream.title if s.stream else None,
                     "game": s.stream.game_name() if s.stream else None,
                     "unlocked_rewards": getattr(s, 'unlocked_rewards', 0),
+                    "last_rewards": getattr(s, 'last_rewards', [])[:5],
                 })
         return Response(
             json.dumps(streamers),

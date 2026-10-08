@@ -5,6 +5,7 @@
 
 
 import copy
+import json
 import logging
 import os
 import random
@@ -1043,6 +1044,63 @@ class Twitch(object):
         }
         self.post_gql_request(json_data)
 
+    # Path of the file used to remember which rewards were already redeemed.
+    # Persisted so restarting the miner does not re-redeem the same rewards.
+    @property
+    def _redeem_state_path(self):
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        return os.path.join(base, "data", "redeemed_rewards.json")
+
+    # Keywords that mark a reward as an AUDIO reward (sound/TTS/song/etc).
+    # These are never redeemed so the miner can't trigger noises on stream.
+    _SOUND_KEYWORDS = (
+        "tts", "text to speech", "text-to-speech", "sound", "sound alert",
+        "song", "song request", "music", "audio", "voice", "speech",
+        "sing", "scream", "moan", "burp", "fart", "air horn", "airhorn",
+        "vine boom", "siren", "screech", "noise", "radio", "podcast",
+        "megaphone", "beep", "honk", "squeak", "whistle", "jump scare",
+        "jumpscare", "play audio", "play sound", "drum roll", "airhorn",
+    )
+
+    def _is_sound_reward(self, title, prompt):
+        """True if a reward looks like it plays audio (TTS/song/sound alert).
+
+        Uses word-boundary matching so e.g. 'sing' does not match 'Single',
+        while multi-word phrases still match as substrings.
+        """
+        haystack = f"{title or ''} {prompt or ''}".lower()
+        for kw in self._SOUND_KEYWORDS:
+            if " " in kw or "-" in kw:
+                if kw in haystack:
+                    return True
+            elif re.search(rf"\b{re.escape(kw)}\b", haystack):
+                return True
+        return False
+
+    def _is_blocked_reward(self, title, prompt, blocklist):
+        """True if the reward matches a user-supplied blocklist keyword."""
+        haystack = f"{title or ''} {prompt or ''}".lower()
+        return any(str(kw).lower() in haystack for kw in (blocklist or []) if str(kw).strip())
+
+    def _load_redeem_state(self):
+        try:
+            with open(self._redeem_state_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, dict) else {}
+        except (FileNotFoundError, ValueError, OSError):
+            return {}
+
+    def _save_redeem_state(self, state):
+        try:
+            path = self._redeem_state_path
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(state, f)
+            os.replace(tmp, path)
+        except OSError as e:
+            logger.debug(f"Could not save redeem state: {e}")
+
     def redeem_all_rewards(self, streamer):
         """Unlock all available channel point rewards (emotes, etc) for a streamer.
 
@@ -1050,11 +1108,27 @@ class Twitch(object):
         ``error.code`` so failures are reported honestly instead of silently counted
         as successes. Rewards we can't redeem (too expensive, disabled, out of stock,
         paused, or not allowed by Twitch) are skipped without hammering the API.
+
+        Redeemed reward IDs are persisted per streamer + broadcast_id, so a restart
+        while a stream is still live does NOT re-redeem the same rewards; a new
+        broadcast_id (new stream) starts a fresh set.
         """
         try:
             # Need the channel ID to redeem; resolve it if we don't have it yet.
             if not streamer.channel_id:
                 return 0
+
+            # Load persisted state and reset it when the broadcast changed.
+            state = self._load_redeem_state()
+            entry = state.get(streamer.username) or {}
+            broadcast_id = str(streamer.stream.broadcast_id or "")
+            if entry.get("broadcast_id") != broadcast_id:
+                entry = {"broadcast_id": broadcast_id, "rewards": [], "count": 0}
+                state[streamer.username] = entry
+            already_done = set(entry.get("rewards") or [])
+            # Number of successful redemptions so far for THIS broadcast, so the
+            # per-stream cap holds across loop iterations and restarts.
+            redeemed_this_stream = int(entry.get("count") or 0)
 
             # Get channel points context to find available rewards
             json_data = copy.deepcopy(GQLOperations.ChannelPointsContext)
@@ -1091,14 +1165,41 @@ class Twitch(object):
             if not all_rewards:
                 return 0
 
+            # Anti-spam config from streamer settings
+            max_per_stream = getattr(streamer.settings, "auto_redeem_max_per_stream", 0) or 0
+            skip_sounds = getattr(streamer.settings, "auto_redeem_skip_sounds", True)
+            blocklist = getattr(streamer.settings, "auto_redeem_blocklist", []) or []
+            redeem_delay = getattr(streamer.settings, "auto_redeem_delay", 5.0) or 0
+
             unlocked_count = 0
             for reward in all_rewards:
                 reward_id = reward["id"]
                 cost = reward["cost"]
                 title = reward["title"]
+                prompt = reward.get("prompt")
 
-                # Skip invalid entries
-                if not reward_id or cost is None or not isinstance(cost, (int, float)):
+                # Stop once we hit the per-stream cap (anti-spam). Uses the
+                # persisted counter so the cap holds across loop iterations.
+                if max_per_stream and redeemed_this_stream >= max_per_stream:
+                    logger.info(
+                        f"Reached auto-redeem cap ({max_per_stream}) for {streamer.username}, stopping."
+                    )
+                    break
+
+                # Skip invalid entries. Cost 0 rewards are not redeemable through
+                # this mutation (Twitch returns a GraphQL "service error"), so skip.
+                if not reward_id or cost is None or not isinstance(cost, (int, float)) or cost <= 0:
+                    continue
+
+                # Skip AUDIO rewards (TTS/song/sound alerts) so we never trigger
+                # noises on the streamer's channel
+                if skip_sounds and self._is_sound_reward(title, prompt):
+                    logger.debug(f"Skipping sound reward: {title} for {streamer.username}")
+                    continue
+
+                # Skip user-blocklisted rewards
+                if self._is_blocked_reward(title, prompt, blocklist):
+                    logger.debug(f"Skipping blocklisted reward: {title} for {streamer.username}")
                     continue
 
                 # Skip if not enough points, disabled, out of stock, or paused
@@ -1106,9 +1207,14 @@ class Twitch(object):
                     continue
                 if not reward["is_enabled"] or not reward["in_stock"] or reward["is_paused"]:
                     continue
-                # Skip rewards already redeemed in this online session
-                if streamer.redeemed_rewards.get(reward_id):
+                # Skip rewards already redeemed (this session or a previous run
+                # of the same live broadcast)
+                if reward_id in already_done or streamer.redeemed_rewards.get(reward_id):
                     continue
+
+                # Pace redemptions so we never burst-claim (anti-spam / avoids bans)
+                if redeem_delay > 0 and unlocked_count > 0:
+                    time.sleep(redeem_delay)
 
                 # Redeem with the full mutation body + ALL required input fields.
                 # Twitch's RedeemCommunityPointsCustomRewardInput validates that
@@ -1128,7 +1234,8 @@ class Twitch(object):
                 }
                 redeem_response = self.post_gql_request(redeem_data)
 
-                # Inspect the actual result: Twitch returns error.code on failure
+                # Inspect the actual result: Twitch returns error.code on failure,
+                # or a top-level "errors" array for GraphQL-level failures.
                 payload = (
                     (redeem_response or {})
                     .get("data", {})
@@ -1139,27 +1246,52 @@ class Twitch(object):
 
                 if redemption and not error:
                     unlocked_count += 1
+                    redeemed_this_stream += 1
                     streamer.redeemed_rewards[reward_id] = True
+                    already_done.add(reward_id)
+                    entry["rewards"] = sorted(already_done)
+                    entry["count"] = redeemed_this_stream
+                    state[streamer.username] = entry
+                    self._save_redeem_state(state)
+                    # Record for the /watch dashboard (most recent first)
+                    try:
+                        streamer.last_rewards.insert(0, {
+                            "title": title,
+                            "cost": int(cost),
+                            "at": int(time.time()),
+                        })
+                        streamer.last_rewards = streamer.last_rewards[:10]
+                    except Exception:
+                        pass
                     # Twitch deducts the points server-side; keep local balance in sync
                     streamer.channel_points = max(0, streamer.channel_points - int(cost))
                     logger.info(
-                        f"🔓 Unlocked reward: {title} ({cost} points) for {streamer.username}",
+                        f"Unlocked reward: {title} ({cost} points) for {streamer.username}",
                         extra={"emoji": ":unlock:", "event": Events.BONUS_CLAIM},
                     )
                 else:
-                    code = (error or {}).get("code", "UNKNOWN")
+                    if error:
+                        code = error.get("code", "UNKNOWN")
+                    else:
+                        gql_errors = (redeem_response or {}).get("errors") or []
+                        code = (gql_errors[0].get("message", "UNKNOWN")
+                                if gql_errors and isinstance(gql_errors[0], dict) else "UNKNOWN")
                     # Mark as attempted so we don't retry a hopeless reward every loop.
                     # DUPLICATE_TRANSACTION/TRANSACTION_IN_PROGRESS are transient and
                     # worth retrying, so don't mark those.
                     if code not in ("DUPLICATE_TRANSACTION", "TRANSACTION_IN_PROGRESS"):
                         streamer.redeemed_rewards[reward_id] = True
+                        already_done.add(reward_id)
+                        entry["rewards"] = sorted(already_done)
+                        state[streamer.username] = entry
+                        self._save_redeem_state(state)
                     logger.info(
-                        f"⚠️ Could not redeem '{title}' ({cost} points) for {streamer.username}: {code}"
+                        f"Could not redeem '{title}' ({cost} points) for {streamer.username}: {code}"
                     )
 
             if unlocked_count > 0:
                 logger.info(
-                    f"🎉 Unlocked {unlocked_count} rewards for {streamer.username}!",
+                    f"Unlocked {unlocked_count} rewards for {streamer.username}!",
                     extra={"emoji": ":tada:", "event": Events.BONUS_CLAIM},
                 )
 

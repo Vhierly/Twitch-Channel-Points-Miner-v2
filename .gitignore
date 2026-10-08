@@ -159,3 +159,6 @@ replit.nix
 
 #idkyet
 main.py.env
+
+# Auto-redeem state
+data/

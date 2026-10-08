@@ -63,6 +63,24 @@
         .badge-online { background: #00ff88; color: #000; }
         .badge-offline { background: #ff6b6b; color: #fff; }
         .last-update { color: #666; font-size: 0.8rem; text-align: right; margin-top: 10px; }
+        .rewards-box {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed #2a3a5e;
+            text-align: left;
+        }
+        .rewards-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .reward-pill {
+            display: inline-block;
+            background: #1f2b4d;
+            color: #ffe045;
+            border-radius: 10px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            margin: 3px 4px 0 0;
+        }
+        .reward-pill .r-title { color: #e6e6e6; }
+        .reward-pill .r-cost { color: #888; }
     </style>
 </head>
 <body>
@@ -80,6 +98,26 @@
     </div>
 
     <script>
+        function esc(t) {
+            return String(t == null ? '' : t)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function rewardsHtml(s) {
+            if (!s.last_rewards || s.last_rewards.length === 0) return '';
+            const pills = s.last_rewards.map(r =>
+                `<span class="reward-pill" title="${r.cost} points">
+                    <span class="r-title">${esc(r.title)}</span>
+                    <span class="r-cost">· ${r.cost}</span>
+                </span>`
+            ).join('');
+            return `<div class="rewards-box">
+                <div class="rewards-label">🎁 Last rewards claimed</div>
+                ${pills}
+            </div>`;
+        }
+
         function loadData() {
             $.getJSON('/api/watching', function(data) {
                 const online = data.filter(s => s.is_online);
@@ -91,14 +129,15 @@
                 // Online streamers
                 $('#online-streamers').html(online.map(s => `
                     <div class="streamer-card online-card">
-                        <div class="streamer-avatar">${s.username.charAt(0).toUpperCase()}</div>
+                        <div class="streamer-avatar">${esc(s.username.charAt(0).toUpperCase())}</div>
                         <div class="streamer-info">
                             <div class="streamer-name">
-                                <a href="https://twitch.tv/${s.username}" target="_blank" style="color: #fff;">${s.username}</a>
+                                <a href="https://twitch.tv/${esc(s.username)}" target="_blank" style="color: #fff;">${esc(s.username)}</a>
                                 <span class="status-badge badge-online">LIVE</span>
                             </div>
-                            ${s.title ? `<div class="streamer-title">${s.title}</div>` : ''}
-                            ${s.game ? `<div class="streamer-game">🎮 ${s.game}</div>` : ''}
+                            ${s.title ? `<div class="streamer-title">${esc(s.title)}</div>` : ''}
+                            ${s.game ? `<div class="streamer-game">🎮 ${esc(s.game)}</div>` : ''}
+                            ${rewardsHtml(s)}
                         </div>
                         <div class="streamer-points">
                             <div class="points-value">${s.channel_points.toLocaleString()}</div>
@@ -111,12 +150,13 @@
                 // Offline streamers
                 $('#offline-streamers').html(offline.map(s => `
                     <div class="streamer-card offline-card">
-                        <div class="streamer-avatar">${s.username.charAt(0).toUpperCase()}</div>
+                        <div class="streamer-avatar">${esc(s.username.charAt(0).toUpperCase())}</div>
                         <div class="streamer-info">
                             <div class="streamer-name">
-                                <a href="https://twitch.tv/${s.username}" target="_blank" style="color: #aaa;">${s.username}</a>
+                                <a href="https://twitch.tv/${esc(s.username)}" target="_blank" style="color: #aaa;">${esc(s.username)}</a>
                                 <span class="status-badge badge-offline">OFFLINE</span>
                             </div>
+                            ${rewardsHtml(s)}
                         </div>
                         <div class="streamer-points">
                             <div class="points-value">${s.channel_points.toLocaleString()}</div>

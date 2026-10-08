@@ -235,7 +235,6 @@ class TwitchChannelPointsMiner:
         if self.running:
             logger.error("You can't start multiple sessions of this instance!")
         else:
-            print(f"[DEBUG] run() called, starting session {self.session_id}", flush=True)
             logger.info(
                 f"Start session: '{self.session_id}'", extra={"emoji": ":bomb:"}
             )
@@ -450,7 +449,6 @@ class TwitchChannelPointsMiner:
 
             refresh_context = time.time()
             while self.running:
-                print(f"[DEBUG] Loop iteration: running={self.running}, streamers={len(self.streamers)}", flush=True)
                 time.sleep(random.uniform(20, 60))
 
                 # #639: Add/remove streamer on runtime

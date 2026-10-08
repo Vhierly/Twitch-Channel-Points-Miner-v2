@@ -32,6 +32,10 @@ class StreamerSettings(object):
         "greeting_message",
         "auto_buy",
         "auto_redeem_rewards",
+        "auto_redeem_max_per_stream",
+        "auto_redeem_skip_sounds",
+        "auto_redeem_blocklist",
+        "auto_redeem_delay",
     ]
 
     def __init__(
@@ -51,6 +55,10 @@ class StreamerSettings(object):
         greeting_message: str = None,
         auto_buy: bool = None,
         auto_redeem_rewards: bool = None,
+        auto_redeem_max_per_stream: int = None,
+        auto_redeem_skip_sounds: bool = None,
+        auto_redeem_blocklist: list = None,
+        auto_redeem_delay: float = None,
     ):
         self.make_predictions = make_predictions
         self.follow_raid = follow_raid
@@ -67,6 +75,14 @@ class StreamerSettings(object):
         self.greeting_message = greeting_message
         self.auto_buy = auto_buy
         self.auto_redeem_rewards = auto_redeem_rewards
+        # Anti-spam: max rewards to redeem per stream (0 = unlimited)
+        self.auto_redeem_max_per_stream = auto_redeem_max_per_stream
+        # Skip rewards whose title/prompt look like sounds (TTS, song, sound alerts)
+        self.auto_redeem_skip_sounds = auto_redeem_skip_sounds
+        # Extra user keywords to never redeem (matched case-insensitively)
+        self.auto_redeem_blocklist = auto_redeem_blocklist
+        # Seconds to wait between consecutive redemptions (anti-spam)
+        self.auto_redeem_delay = auto_redeem_delay
 
     def default(self):
         for name in [
@@ -98,6 +114,14 @@ class StreamerSettings(object):
             self.auto_buy = False
         if self.auto_redeem_rewards is None:
             self.auto_redeem_rewards = True
+        if self.auto_redeem_max_per_stream is None:
+            self.auto_redeem_max_per_stream = 0
+        if self.auto_redeem_skip_sounds is None:
+            self.auto_redeem_skip_sounds = True
+        if self.auto_redeem_blocklist is None:
+            self.auto_redeem_blocklist = []
+        if self.auto_redeem_delay is None:
+            self.auto_redeem_delay = 5.0
 
     def __repr__(self):
         return f"StreamerSettings(make_predictions={self.make_predictions}, follow_raid={self.follow_raid}, claim_drops={self.claim_drops}, claim_moments={self.claim_moments}, watch_streak={self.watch_streak}, community_goals={self.community_goals}, bet={self.bet}, chat={self.chat}, random_messages={self.random_messages}, random_message_interval={self.random_message_interval}, low_priority={self.low_priority}, favorite={self.favorite}, greeting_message={self.greeting_message}, auto_buy={self.auto_buy}, auto_redeem_rewards={self.auto_redeem_rewards})"
@@ -125,6 +149,7 @@ class Streamer(object):
         "mutex",
         "unlocked_rewards",
         "redeemed_rewards",
+        "last_rewards",
     ]
 
     def __init__(self, username, settings=None):
@@ -155,6 +180,9 @@ class Streamer(object):
         # session. Reset on each new stream so a cheap reward isn't redeemed every
         # loop iteration (which would spam the streamer and drain points).
         self.redeemed_rewards = {}
+        # Last redeemed reward info per stream (for the /watch dashboard):
+        # {"title": str, "cost": int, "at": epoch_seconds}
+        self.last_rewards = []
 
     def __repr__(self):
         return f"Streamer(username={self.username}, channel_id={self.channel_id}, channel_points={_millify(self.channel_points)})"
@@ -187,6 +215,7 @@ class Streamer(object):
             self.is_online = True
             # New stream session -> allow redeeming each reward once again
             self.redeemed_rewards = {}
+            self.last_rewards = []
             # #825: Preserve watch streak progress if streamer was recently offline
             # Only reset streak if it's been more than 30 minutes since last offline
             # or if we haven't started watching yet
