@@ -1042,6 +1042,77 @@ class Twitch(object):
         }
         self.post_gql_request(json_data)
 
+    def redeem_all_rewards(self, streamer):
+        """Unlock all available channel point rewards (emotes) for a streamer."""
+        try:
+            # Get channel points context to find available rewards
+            json_data = copy.deepcopy(GQLOperations.ChannelPointsContext)
+            json_data["variables"] = {"channelLogin": streamer.username}
+            response = self.post_gql_request(json_data)
+
+            if not response or "data" not in response:
+                return 0
+
+            channel = response.get("data", {}).get("community", {}).get("channel", {})
+            if not channel:
+                return 0
+
+            settings = channel.get("communityPointsSettings", {})
+            if not settings:
+                return 0
+
+            # Get custom rewards (emotes)
+            custom_rewards = settings.get("customRewards", [])
+            if not custom_rewards:
+                return 0
+
+            unlocked_count = 0
+            for reward in custom_rewards:
+                reward_id = reward.get("id")
+                cost = reward.get("cost", 0)
+                title = reward.get("title", "Unknown")
+
+                # Skip if not enough points or already redeemed
+                if cost > streamer.channel_points:
+                    continue
+
+                # Redeem the reward
+                redeem_data = {
+                    "operationName": "RedeemCommunityPointsCustomReward",
+                    "variables": {
+                        "input": {
+                            "channelID": streamer.channel_id,
+                            "rewardID": reward_id
+                        }
+                    },
+                    "extensions": {
+                        "persistedQuery": {
+                            "version": 1,
+                            "sha256Hash": "58b0e2a4-0a4f-4f1e-9c1a-9f8e7d6c5b4a"
+                        }
+                    }
+                }
+                redeem_response = self.post_gql_request(redeem_data)
+
+                if redeem_response and "data" in redeem_response:
+                    unlocked_count += 1
+                    logger.info(
+                        f"🔓 Unlocked reward: {title} ({cost} points) for {streamer.username}",
+                        extra={"emoji": ":unlock:", "event": Events.BONUS_CLAIM}
+                    )
+
+            if unlocked_count > 0:
+                logger.info(
+                    f"🎉 Unlocked {unlocked_count} rewards for {streamer.username}!",
+                    extra={"emoji": ":tada:", "event": Events.BONUS_CLAIM}
+                )
+
+            return unlocked_count
+
+        except Exception as e:
+            logger.error(f"Error redeeming rewards for {streamer.username}: {e}")
+            return 0
+
     # === MOMENTS === #
     def claim_moment(self, streamer, moment_id):
         if Settings.logger.less is False:

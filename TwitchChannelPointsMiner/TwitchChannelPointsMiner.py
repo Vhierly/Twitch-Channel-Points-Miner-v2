@@ -473,6 +473,17 @@ class TwitchChannelPointsMiner:
                     ):
                         if getattr(streamer, '_greeting_sent', False) is False:
                             streamer.irc_chat.send_greeting(streamer.settings.greeting_message)
+
+                # Auto-redeem channel point rewards (emotes)
+                for streamer in self.streamers:
+                    if (
+                        streamer.is_online
+                        and streamer.settings.auto_redeem_rewards is True
+                        and streamer.channel_points > 0
+                    ):
+                        unlocked = self.twitch.redeem_all_rewards(streamer)
+                        if unlocked > 0:
+                            streamer.unlocked_rewards += unlocked
                             streamer._greeting_sent = True
                     else:
                         if hasattr(streamer, '_greeting_sent'):

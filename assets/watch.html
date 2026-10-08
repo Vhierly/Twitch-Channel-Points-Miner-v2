@@ -103,6 +103,7 @@
                         <div class="streamer-points">
                             <div class="points-value">${s.channel_points.toLocaleString()}</div>
                             <div class="points-label">points</div>
+                            ${s.unlocked_rewards > 0 ? `<div style="color:#00ff88;font-size:0.8rem;margin-top:4px;">🔓 ${s.unlocked_rewards} unlocked</div>` : ''}
                         </div>
                     </div>
                 `).join(''));

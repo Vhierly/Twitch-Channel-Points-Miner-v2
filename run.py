@@ -75,6 +75,7 @@ twitch_miner = TwitchChannelPointsMiner(
         claim_drops=True,       # Auto-claim drops
         watch_streak=True,      # Prioritaskan watch streak
         chat=ChatPresence.ONLINE,  # Join IRC chat saat streamer online
+        auto_redeem_rewards=True,  # Auto-unlock semua emote/reward pakai points
         bet=BetSettings(
             strategy=Strategy.MOST_VOTED,  # Pilih outcome dengan user terbanyak (paling mungkin menang)
             percentage=3,                  # 3% dari balance (aman)

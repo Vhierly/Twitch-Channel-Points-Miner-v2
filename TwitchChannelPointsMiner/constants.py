@@ -228,6 +228,15 @@ class GQLOperations:
             }
         }
     }
+    RedeemCommunityPointsCustomReward = {
+        "operationName": "RedeemCommunityPointsCustomReward",
+        "extensions": {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "58b0e2a4-0a4f-4f1e-9c1a-9f8e7d6c5b4a"
+            }
+        }
+    }
     ChannelPointsStore = {
         "operationName": "ChannelPointsStore",
         "variables": {"channelLogin": None},

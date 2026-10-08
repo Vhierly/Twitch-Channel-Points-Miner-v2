@@ -31,6 +31,7 @@ class StreamerSettings(object):
         "favorite",
         "greeting_message",
         "auto_buy",
+        "auto_redeem_rewards",
     ]
 
     def __init__(
@@ -49,6 +50,7 @@ class StreamerSettings(object):
         favorite: bool = None,
         greeting_message: str = None,
         auto_buy: bool = None,
+        auto_redeem_rewards: bool = None,
     ):
         self.make_predictions = make_predictions
         self.follow_raid = follow_raid
@@ -64,6 +66,7 @@ class StreamerSettings(object):
         self.favorite = favorite
         self.greeting_message = greeting_message
         self.auto_buy = auto_buy
+        self.auto_redeem_rewards = auto_redeem_rewards
 
     def default(self):
         for name in [
@@ -93,9 +96,11 @@ class StreamerSettings(object):
             self.greeting_message = ""
         if self.auto_buy is None:
             self.auto_buy = False
+        if self.auto_redeem_rewards is None:
+            self.auto_redeem_rewards = False
 
     def __repr__(self):
-        return f"StreamerSettings(make_predictions={self.make_predictions}, follow_raid={self.follow_raid}, claim_drops={self.claim_drops}, claim_moments={self.claim_moments}, watch_streak={self.watch_streak}, community_goals={self.community_goals}, bet={self.bet}, chat={self.chat}, random_messages={self.random_messages}, random_message_interval={self.random_message_interval}, low_priority={self.low_priority}, favorite={self.favorite}, greeting_message={self.greeting_message}, auto_buy={self.auto_buy})"
+        return f"StreamerSettings(make_predictions={self.make_predictions}, follow_raid={self.follow_raid}, claim_drops={self.claim_drops}, claim_moments={self.claim_moments}, watch_streak={self.watch_streak}, community_goals={self.community_goals}, bet={self.bet}, chat={self.chat}, random_messages={self.random_messages}, random_message_interval={self.random_message_interval}, low_priority={self.low_priority}, favorite={self.favorite}, greeting_message={self.greeting_message}, auto_buy={self.auto_buy}, auto_redeem_rewards={self.auto_redeem_rewards})"
 
 
 class Streamer(object):
@@ -118,6 +123,7 @@ class Streamer(object):
         "history",
         "streamer_url",
         "mutex",
+        "unlocked_rewards",
     ]
 
     def __init__(self, username, settings=None):
@@ -143,6 +149,7 @@ class Streamer(object):
         self.streamer_url = f"{URL}/{self.username}"
 
         self.mutex = Lock()
+        self.unlocked_rewards = 0
 
     def __repr__(self):
         return f"Streamer(username={self.username}, channel_id={self.channel_id}, channel_points={_millify(self.channel_points)})"
