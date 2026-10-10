@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from enum import Enum, auto
 from threading import Thread
@@ -73,9 +74,9 @@ class ClientIRC(SingleServerIRCBot):
             # chan = event.target
 
             # #611: Nickname Highlighter - highlight nickname in the message
-            highlighted_msg = msg.replace(
-                mention, f"\033[1;33m{mention}\033[0m"
-            ) if mention in msg else msg
+            highlighted_msg = re.sub(
+                re.escape(mention), f"\033[1;33m{mention}\033[0m", msg, flags=re.IGNORECASE
+            )
 
             logger.info(f"{nick} at {self.channel} wrote: {highlighted_msg}", extra={
                         "emoji": ":speech_balloon:", "event": Events.CHAT_MENTION})

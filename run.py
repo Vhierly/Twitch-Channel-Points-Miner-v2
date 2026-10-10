@@ -96,8 +96,12 @@ twitch_miner = TwitchChannelPointsMiner(
 
 # ==================== JALANKAN ====================
 
+# Analytics dashboard host: defaults to localhost (safe). Set ANALYTICS_HOST=0.0.0.0
+# in .env or environment to expose on the network (no authentication!).
+analytics_host = os.environ.get("ANALYTICS_HOST", "127.0.0.1")
+
 # Start analytics server (dashboard web)
-twitch_miner.analytics(host="0.0.0.0", port=5000, refresh=5, days_ago=7)
+twitch_miner.analytics(host=analytics_host, port=5000, refresh=5, days_ago=7)
 
 # Start mining
 twitch_miner.mine(
