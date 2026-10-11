@@ -71,7 +71,8 @@ class Stream(object):
         return f"Stream(title={self.title}, game={self.__str_game()}, tags={self.__str_tags()})"
 
     def __str__(self):
-        return f"{self.title}" if Settings.logger.less else self.__repr__()
+        less = getattr(getattr(Settings, "logger", None), "less", False)
+        return f"{self.title}" if less else self.__repr__()
 
     def __str_tags(self):
         return (

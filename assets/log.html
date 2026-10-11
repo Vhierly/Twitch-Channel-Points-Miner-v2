@@ -70,6 +70,12 @@
             return 'log-info';
         }
 
+        function esc(t) {
+            return String(t == null ? '' : t)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         function loadLog() {
             $.get('/log', function(data) {
                 const lines = data.split('\n').filter(l => l.trim());
@@ -86,7 +92,7 @@
 
                 const html = filtered.map(line => {
                     const cls = classifyLine(line);
-                    return `<div class="log-line ${cls}">${line}</div>`;
+                    return `<div class="log-line ${cls}">${esc(line)}</div>`;
                 }).join('');
 
                 $('#log-content').html(html || '<div class="log-line">No log entries yet...</div>');

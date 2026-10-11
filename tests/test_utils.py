@@ -11,19 +11,19 @@ from TwitchChannelPointsMiner.utils import (
 
 class TestMillify:
     def test_millify_thousands(self):
-        assert _millify(1000) == "1.00K"
+        assert _millify(1000) == "1k"
 
     def test_millify_millions(self):
-        assert _millify(1000000) == "1.00M"
+        assert _millify(1000000) == "1M"
 
     def test_millify_billions(self):
-        assert _millify(1000000000) == "1.00B"
+        assert _millify(1000000000) == "1B"
 
     def test_millify_zero(self):
-        assert _millify(0) == "0.00"
+        assert _millify(0) == "0"
 
     def test_millify_small_number(self):
-        assert _millify(500) == "500.00"
+        assert _millify(500) == "500"
 
 
 class TestPercentage:

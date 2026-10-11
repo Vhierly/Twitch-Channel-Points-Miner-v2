@@ -1,3 +1,4 @@
+import os
 from enum import Enum, auto
 
 
@@ -25,6 +26,10 @@ class Settings(object):
     __slots__ = ["logger", "streamer_settings",
                  "enable_analytics", "disable_ssl_cert_verification", "disable_at_in_nickname",
                  "max_watch_amount", "_miner_instance"]
+
+
+# Default analytics path (class attribute, not in __slots__)
+Settings.analytics_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "analytics")
 
 
 class Events(Enum):

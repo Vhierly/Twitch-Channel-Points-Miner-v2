@@ -1,5 +1,19 @@
 # -*- coding: utf-8 -*-
 import logging
+import os
+import sys
+from pathlib import Path
+
+# Load .env file if exists
+env_path = Path(__file__).parent / ".env"
+if env_path.exists():
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip())
+
 from colorama import Fore
 from TwitchChannelPointsMiner import TwitchChannelPointsMiner
 from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
@@ -12,15 +26,18 @@ from TwitchChannelPointsMiner.classes.Pushover import Pushover
 from TwitchChannelPointsMiner.classes.Settings import Priority, Events, FollowersOrder
 from TwitchChannelPointsMiner.classes.entities.Bet import Strategy, BetSettings, Condition, OutcomeKeys, FilterCondition, DelayMode
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
-import keep_replit_alive
-import os
-from dotenv import load_dotenv, dotenv_values
-load_dotenv()
 
+# Read credentials from environment
+username = os.environ.get("TWITCH_USERNAME", "")
+password = os.environ.get("TWITCH_PASSWORD", "")
+
+if not username or username == "your-twitch-username":
+    print("Error: TWITCH_USERNAME not set in .env or environment")
+    sys.exit(1)
 
 twitch_miner = TwitchChannelPointsMiner(
-    username='username',
-    password='passwd',
+    username=username,
+    password=password,
     # If you want to auto claim all drops from Twitch inventory on the startup
     claim_drops_startup=True,
     priority=[                                  # Custom priority in this case for example:
@@ -64,9 +81,9 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         telegram=Telegram(                                                          # You can omit or set to None if you don't want to receive updates on Telegram
             # Chat ID to send messages @getmyid_bot
-            chat_id='telech',
+            chat_id=os.environ.get("TELEGRAM_CHAT_ID", ""),
             # Telegram API token @BotFather
-            token='tokench',
+            token=os.environ.get("TELEGRAM_TOKEN", ""),
             events=[Events.BET_START, Events.BET_LOSE, Events.CHAT_MENTION, Events.BET_WIN, Events.JOIN_RAID,
                     Events.STREAMER_ONLINE, Events.GAIN_FOR_RAID, Events.GAIN_FOR_CLAIM,
                     Events.GAIN_FOR_WATCH],
@@ -75,14 +92,14 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         discord=Discord(
             # Discord Webhook URL
-            webhook_api='dwebhook',
+            webhook_api=os.environ.get("DISCORD_WEBHOOK", ""),
             events=[Events.BET_START, Events.BET_LOSE, Events.CHAT_MENTION, Events.BET_WIN, Events.JOIN_RAID,
                     Events.STREAMER_ONLINE, Events.GAIN_FOR_RAID, Events.GAIN_FOR_CLAIM,
                     Events.GAIN_FOR_WATCH],
         ),
         webhook=Webhook(
             # Webhook URL
-            endpoint="https://example.com/webhook",
+            endpoint=os.environ.get("WEBHOOK_URL", "https://example.com/webhook"),
             # GET or POST
             method="GET",
             events=[Events.STREAMER_ONLINE, Events.STREAMER_OFFLINE,
@@ -91,21 +108,21 @@ twitch_miner = TwitchChannelPointsMiner(
         ),
         matrix=Matrix(
             # Matrix username (without homeserver)
-            username="twitch_miner",
+            username=os.environ.get("MATRIX_USERNAME", "twitch_miner"),
             # Matrix password
-            password="...",
+            password=os.environ.get("MATRIX_PASSWORD", ""),
             # Matrix homeserver
-            homeserver="matrix.org",
+            homeserver=os.environ.get("MATRIX_HOMESERVER", "matrix.org"),
             # Room ID
-            room_id="...",
+            room_id=os.environ.get("MATRIX_ROOM_ID", ""),
             events=[Events.STREAMER_ONLINE, Events.STREAMER_OFFLINE,
                     Events.BET_LOSE],  # Only these events will be sent
         ),
         pushover=Pushover(
             # Login to https://pushover.net/, the user token is on the main page
-            userkey='userpush',
+            userkey=os.environ.get("PUSHOVER_USERKEY", ""),
             # Create a application on the website, and use the token shown in your application
-            token='tokenpush',
+            token=os.environ.get("PUSHOVER_TOKEN", ""),
             # Read more about priority here: https://pushover.net/api#priority
             priority=0,
             # A list of sounds can be found here: https://pushover.net/api#sounds
@@ -160,7 +177,6 @@ twitch_miner = TwitchChannelPointsMiner(
 
 # Start the Analytics web-server
 twitch_miner.analytics(host="127.0.0.1", port=5000, refresh=5, days_ago=7)
-keep_replit_alive.keep_alive()
 twitch_miner.mine(
     # Array of streamers (order = priority)
     [],

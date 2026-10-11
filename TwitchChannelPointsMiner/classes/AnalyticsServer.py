@@ -57,15 +57,18 @@ def filter_datas(start_date, end_date, datas):
 
     if "series" in datas:
         df = pd.DataFrame(datas["series"])
-        df["datetime"] = pd.to_datetime(df.x // 1000, unit="s")
+        if df.empty or "x" not in df.columns:
+            datas["series"] = []
+        else:
+            df["datetime"] = pd.to_datetime(df["x"] // 1000, unit="s")
 
-        df = df[(df.x >= start_date) & (df.x <= end_date)]
+            df = df[(df["x"] >= start_date) & (df["x"] <= end_date)]
 
-        datas["series"] = (
-            df.drop(columns="datetime")
-            .sort_values(by=["x", "y"], ascending=True)
-            .to_dict("records")
-        )
+            datas["series"] = (
+                df.drop(columns="datetime")
+                .sort_values(by=["x", "y"], ascending=True)
+                .to_dict("records")
+            )
     else:
         datas["series"] = []
 
@@ -75,27 +78,33 @@ def filter_datas(start_date, end_date, datas):
         new_end_date = start_date
         new_start_date = 0
         df = pd.DataFrame(original_series)
-        df["datetime"] = pd.to_datetime(df.x // 1000, unit="s")
+        if df.empty or "x" not in df.columns:
+            datas["series"] = []
+        else:
+            df["datetime"] = pd.to_datetime(df["x"] // 1000, unit="s")
 
-        # Attempt to get the last known balance from before the provided timeframe
-        df = df[(df.x >= new_start_date) & (df.x <= new_end_date)]
-        last_balance = df.drop(columns="datetime").sort_values(
-            by=["x", "y"], ascending=True).to_dict("records")[-1]['y']
+            # Attempt to get the last known balance from before the provided timeframe
+            df = df[(df["x"] >= new_start_date) & (df["x"] <= new_end_date)]
+            last_balance = df.drop(columns="datetime").sort_values(
+                by=["x", "y"], ascending=True).to_dict("records")[-1]['y']
 
-        datas["series"] = [{'x': start_date, 'y': last_balance, 'z': 'No Stream'}, {
-            'x': end_date, 'y': last_balance, 'z': 'No Stream'}]
+            datas["series"] = [{'x': start_date, 'y': last_balance, 'z': 'No Stream'}, {
+                'x': end_date, 'y': last_balance, 'z': 'No Stream'}]
 
     if "annotations" in datas:
         df = pd.DataFrame(datas["annotations"])
-        df["datetime"] = pd.to_datetime(df.x // 1000, unit="s")
+        if df.empty or "x" not in df.columns:
+            datas["annotations"] = []
+        else:
+            df["datetime"] = pd.to_datetime(df["x"] // 1000, unit="s")
 
-        df = df[(df.x >= start_date) & (df.x <= end_date)]
+            df = df[(df["x"] >= start_date) & (df["x"] <= end_date)]
 
-        datas["annotations"] = (
-            df.drop(columns="datetime")
-            .sort_values(by="x", ascending=True)
-            .to_dict("records")
-        )
+            datas["annotations"] = (
+                df.drop(columns="datetime")
+                .sort_values(by="x", ascending=True)
+                .to_dict("records")
+            )
     else:
         datas["annotations"] = []
 
@@ -303,6 +312,9 @@ class AnalyticsServer(Thread):
         )
         self.app.add_url_rule("/json_all", "json_all",
                               json_all, methods=["GET"])
+        self.app.add_url_rule(
+            "/json/<string:streamer>", "json", read_json, methods=["GET"]
+        )
         self.app.add_url_rule(
             "/log", "log", generate_log, methods=["GET"])
 

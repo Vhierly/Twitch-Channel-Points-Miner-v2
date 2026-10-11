@@ -230,7 +230,6 @@ class TwitchChannelPointsMiner:
         blacklist: list = [],
         followers: bool = False,
         followers_order: FollowersOrder = FollowersOrder.ASC,
-        games: list = [],
     ):
         if self.running:
             logger.error("You can't start multiple sessions of this instance!")
@@ -266,18 +265,6 @@ class TwitchChannelPointsMiner:
                     extra={"emoji": ":clipboard:"},
                 )
                 for username in followers_array:
-                    if username not in streamers_dict and username not in blacklist:
-                        streamers_name.append(username)
-                        streamers_dict[username] = username.lower().strip()
-
-            # #621: Mine by game category instead of by streamer name
-            if games:
-                game_streamers = self.twitch.get_streamers_by_game(games)
-                logger.info(
-                    f"Found {len(game_streamers)} streamers for games: {', '.join(games)}",
-                    extra={"emoji": ":video_game:"},
-                )
-                for username in game_streamers:
                     if username not in streamers_dict and username not in blacklist:
                         streamers_name.append(username)
                         streamers_dict[username] = username.lower().strip()
@@ -473,6 +460,7 @@ class TwitchChannelPointsMiner:
                     ):
                         if getattr(streamer, '_greeting_sent', False) is False:
                             streamer.irc_chat.send_greeting(streamer.settings.greeting_message)
+                            streamer._greeting_sent = True
 
                 # Auto-redeem channel point rewards (emotes)
                 try:

@@ -31,6 +31,7 @@ class StreamerSettings(object):
         "favorite",
         "greeting_message",
         "auto_buy",
+        "auto_buy_max_per_stream",
         "auto_redeem_rewards",
         "auto_redeem_max_per_stream",
         "auto_redeem_skip_sounds",
@@ -54,6 +55,7 @@ class StreamerSettings(object):
         favorite: bool = None,
         greeting_message: str = None,
         auto_buy: bool = None,
+        auto_buy_max_per_stream: int = None,
         auto_redeem_rewards: bool = None,
         auto_redeem_max_per_stream: int = None,
         auto_redeem_skip_sounds: bool = None,
@@ -74,6 +76,7 @@ class StreamerSettings(object):
         self.favorite = favorite
         self.greeting_message = greeting_message
         self.auto_buy = auto_buy
+        self.auto_buy_max_per_stream = auto_buy_max_per_stream
         self.auto_redeem_rewards = auto_redeem_rewards
         # Anti-spam: max rewards to redeem per stream (0 = unlimited)
         self.auto_redeem_max_per_stream = auto_redeem_max_per_stream
@@ -112,6 +115,8 @@ class StreamerSettings(object):
             self.greeting_message = ""
         if self.auto_buy is None:
             self.auto_buy = False
+        if self.auto_buy_max_per_stream is None:
+            self.auto_buy_max_per_stream = 0
         if self.auto_redeem_rewards is None:
             self.auto_redeem_rewards = True
         if self.auto_redeem_max_per_stream is None:
@@ -150,6 +155,8 @@ class Streamer(object):
         "unlocked_rewards",
         "redeemed_rewards",
         "last_rewards",
+        "_greeting_sent",
+        "bought_items",
     ]
 
     def __init__(self, username, settings=None):
@@ -183,14 +190,20 @@ class Streamer(object):
         # Last redeemed reward info per stream (for the /watch dashboard):
         # {"title": str, "cost": int, "at": epoch_seconds}
         self.last_rewards = []
+        # Items already bought during the current online session (item_id -> True)
+        # Reset on each new stream so a new broadcast can buy items again
+        self.bought_items = {}
+        # Greeting sent flag - reset when streamer goes offline/back online
+        self._greeting_sent = False
 
     def __repr__(self):
         return f"Streamer(username={self.username}, channel_id={self.channel_id}, channel_points={_millify(self.channel_points)})"
 
     def __str__(self):
+        less = getattr(getattr(Settings, "logger", None), "less", False)
         return (
             f"{self.username} ({_millify(self.channel_points)} points)"
-            if Settings.logger.less
+            if less
             else self.__repr__()
         )
 
@@ -198,6 +211,8 @@ class Streamer(object):
         if self.is_online is True:
             self.offline_at = time.time()
             self.is_online = False
+            self._greeting_sent = False
+            self.bought_items = {}
 
         self.toggle_chat()
 
@@ -213,9 +228,11 @@ class Streamer(object):
         if self.is_online is False:
             self.online_at = time.time()
             self.is_online = True
+            self._greeting_sent = False
             # New stream session -> allow redeeming each reward once again
             self.redeemed_rewards = {}
             self.last_rewards = []
+            self.bought_items = {}
             # #825: Preserve watch streak progress if streamer was recently offline
             # Only reset streak if it's been more than 30 minutes since last offline
             # or if we haven't started watching yet
@@ -359,6 +376,8 @@ class Streamer(object):
                 self.irc_chat.start()
 
     def toggle_chat(self):
+        if self.settings is None:
+            return
         if self.settings.chat == ChatPresence.ALWAYS:
             self.__join_chat()
         elif self.settings.chat != ChatPresence.NEVER:

@@ -1657,6 +1657,25 @@ class Twitch(object):
         if not store:
             return
         items = store.get("items", [])
+        max_per_stream = getattr(streamer.settings, "auto_buy_max_per_stream", 0) or 0
+        bought_count = 0
         for item in items:
-            if item.get("isAvailable") and item.get("cost", 0) <= streamer.channel_points:
-                self.auto_buy_item(streamer, item["id"], item["cost"])
+            # Stop once we hit the per-stream cap
+            if max_per_stream and bought_count >= max_per_stream:
+                logger.info(
+                    f"Reached auto-buy cap ({max_per_stream}) for {streamer.username}, stopping."
+                )
+                break
+            # Real Twitch ChannelPointsStore items expose isEnabled / isInStock
+            if not item.get("isEnabled") or not item.get("isInStock"):
+                continue
+            item_id = item.get("id")
+            cost = item.get("cost", 0)
+            if not item_id or cost <= 0 or cost > streamer.channel_points:
+                continue
+            # Skip items already bought this stream session
+            if streamer.bought_items.get(item_id):
+                continue
+            if self.auto_buy_item(streamer, item_id, cost):
+                streamer.bought_items[item_id] = True
+                bought_count += 1
